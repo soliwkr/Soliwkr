@@ -1,0 +1,7 @@
+# Core tooling dependencies. Add per-tool packages here as workflows require them.
+python-dotenv>=1.0.0
+requests>=2.31.0
+
+# Google Workspace (SA aios-workspace + domain-wide delegation) — tools/gdocs_replace.py
+google-auth>=2.0.0
+google-api-python-client>=2.0.0

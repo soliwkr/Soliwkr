@@ -1,0 +1,8 @@
+- [Chezmoi persistence](feedback_chezmoi_persistence.md) — proponi chezmoi per ogni modifica di sistema
+- [Changelog operativo](feedback_changelog.md) — aggiorna CHANGELOG.md a fine sessione
+- [Ruolo e obiettivo](user_role.md) — solopreneur, vuole AI co-founder permanente, segue corso AIS-OS
+- [Infrastruttura utente](user_setup.md) — Arch, chezmoi, omarchy, systemd, dominio soliwkr.pro
+- [Token Dashboard](reference_token_dashboard.md) — dashboard analytics su token.soliwkr.pro
+- [Obiettivo TROVATEMI](project_trovatemi_goal.md) — €3.000 MRR entro Natale, porta a porta + fondatori, cliente Vittorio (non Ivan)
+- [Immobiliare = distribuzione](project_immobiliare_distribuzione.md) — pitch: il problema è la distribuzione, non il contenuto
+- [Skill generatore audit](project_audit_generator_skill.md) — DA FARE: trasformare l'audit reputazione in skill riutilizzabile

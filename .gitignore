@@ -1,0 +1,40 @@
+# Secrets & credentials — NEVER commit
+.env
+.dev.vars
+.dev.vars.*
+credentials.json
+token.json
+*.pem
+*.key
+
+# Cloudflare / Node
+node_modules/
+.wrangler/
+
+# Temporary / regenerable processing files
+.tmp/
+!.tmp/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# AIS-OS audit reports (generated)
+audits/
+
+# Extra env formats
+.env.local
