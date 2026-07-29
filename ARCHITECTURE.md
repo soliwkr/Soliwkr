@@ -1,8 +1,22 @@
-# Architettura — WAT + Cloudflare (estende CLAUDE.md)
+# Architettura legacy di workflow — WAT + Cloudflare
 
-Questo documento estende `CLAUDE.md` con lo stack concreto. `CLAUDE.md` resta la fonte dei
-principi WAT; qui si definisce **come** eseguire: quale strumento scegliere e dove far girare il
-codice.
+> **Autorità:** `AGENTS.md` e `governance/` definiscono l'architettura canonica. Questo documento
+> conserva il modello di esecuzione WAT + Cloudflare introdotto nel precedente AIOS TROVATEMI. È
+> una specifica legacy di workflow, non la costituzione di Soliwkr e non autorizza nuovo runtime
+> applicativo in questo repository.
+
+## Layer canonici
+
+1. **Operator & Portfolio AIOS:** Soliwkr, tool-agnostic.
+2. **Business OS:** control plane normativo del singolo business.
+3. **Agent runtime:** processo sostituibile, per esempio Hermes.
+4. **Interfaccia:** canale/cockpit sostituibile.
+5. **Workflow deterministico:** esecuzione idempotente e osservabile.
+6. **Datastore canonico:** stato posseduto dal dominio.
+
+WAT descrive come costruire una specifica automazione. Non comprime questi sei layer in un unico
+“AIOS”. I connector sono adapter, non runtime. Cloudflare esegue workflow e ospita datastore
+designati, ma non crea norme o decisioni.
 
 ---
 
@@ -16,7 +30,8 @@ codice.
 
 ## Gerarchia di selezione dello strumento (Layer 3)
 
-**Principio guida: CLI-first, per QUALSIASI cosa.** Preferisci sempre una CLI. Nell'ordine:
+**Preferenza legacy del runtime locale: CLI-first.** È una scelta di adapter sostituibile, non un
+principio costituzionale. Per questo modello di workflow, l'ordine storico era:
 
 1. **CLI esistente** — usa la CLI ufficiale/nativa del servizio se esiste già:
    - `gcloud` / `gsutil` / `bq` (Google Cloud), `gh` (GitHub), `wrangler` (Cloudflare),
@@ -36,14 +51,14 @@ codice.
 
 ---
 
-## Dove gira il codice — tre runtime
+## Dove gira il codice — contesti legacy
 
 Tre contesti di esecuzione distinti. Sceglili con l'albero decisionale sotto.
 
 | Runtime | Cosa | Quando |
 |---|---|---|
 | **Locale (shell)** | CLI (native o printingpress) + tool Python | Task on-demand nella sessione; sviluppo |
-| **Connettori** | MCP Gmail/Drive/Calendar/Airtable | Operazioni interattive senza codice |
+| **Adapter connettori** | MCP Gmail/Drive/Calendar/Airtable | Operazioni interattive senza codice |
 | **Cloudflare (edge)** | Workflows + Cron Triggers | Automazioni schedulate / non presidiate |
 
 **Albero decisionale runtime:**
@@ -75,6 +90,7 @@ la preferenza Python prevale.
 | Deploy + log | `wrangler deploy`, `wrangler tail`, Observability MCP |
 
 **Cron syntax** (UTC), in `wrangler.jsonc`:
+
 ```jsonc
 { "triggers": { "crons": ["*/30 * * * *", "0 9 * * *"] } }
 ```
@@ -102,9 +118,10 @@ API MCP, Docs, Bindings, Builds, Observability, Logpush.
 
 ---
 
-## Secrets & env vars — regole di sicurezza
+## Secrets & env vars — profilo legacy
 
-- **Ogni secret vive solo in `.env`** (locale, per tool/CLI) — mai hardcoded, mai loggato.
+- Per i tool locali legacy, i secret erano caricati da `.env`; questa non è una posizione
+  universale. Ogni runtime usa il proprio secret store e nessun valore è versionato o loggato.
 - Per Cloudflare: **`.dev.vars`** in locale, **`wrangler secret put`** / dashboard in produzione.
   Aggiungi ogni chiave a staging **e** prod prima del deploy (causa n.1 di fallimenti in prod).
 - Valida sempre in cima al codice: se una var manca, fallisci con messaggio chiaro
@@ -146,8 +163,9 @@ MIT, gratis. Si usa **quando un servizio non ha già una CLI adatta**.
 ## Struttura del repo
 
 ```
-CLAUDE.md              # Principi WAT (fonte istruzioni)
-ARCHITECTURE.md        # Questo file: stack concreto
+AGENTS.md               # Costituzione canonica tool-agnostic
+CLAUDE.md               # Adapter Claude subordinato
+ARCHITECTURE.md         # Specifica legacy WAT + Cloudflare
 tools/                 # Tool Python + config.py (loader .env condiviso)
 workflows/             # SOP markdown (incl. _workflow_builder.md)
 cloudflare/            # Progetti Wrangler (uno per automazione deployata) — vedi cloudflare/README.md

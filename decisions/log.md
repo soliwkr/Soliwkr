@@ -1,6 +1,8 @@
 # Decisions Log
 
-Append-only record of meaningful decisions and why they were made. `/level-up` Phase 2 (Method interview) writes scoped automation specs here. You can also append manually whenever you decide something worth remembering.
+Append-only record for Soliwkr's constitutional and genuinely cross-project decisions. Decisions
+specific to a business or system belong in the decisions log of that owning domain. `/level-up`
+may propose an entry, but does not write every automation specification here automatically.
 
 **Format per entry:**
 
@@ -17,6 +19,35 @@ Append-only record of meaningful decisions and why they were made. `/level-up` P
 ```
 
 Keep it terse. Future-you will thank present-you for capturing the *why*, not just the *what*.
+
+---
+
+## 2026-07-29 — Soliwkr diventa Operator & Portfolio AIOS
+
+**Decisione:** `soliwkr/Soliwkr` è l'Operator & Portfolio AIOS personale di Chris: costituzione,
+registry, routing e memoria cross-project. Non è il business OS TROVATEMI, il database operativo o
+il runtime dell'agente. `AGENTS.md` è canonico e tool-agnostic; `CLAUDE.md` è un adapter subordinato.
+Runtime, interfacce e adapter restano sostituibili.
+
+**Why:** il modello precedente duplicava strategia TROVATEMI e confondeva AIOS, business OS,
+agente, workflow e datastore. Ogni dominio deve conservare una sola autorità. Soliwkr registra dove
+si trova e applica i gate senza incorporarla.
+
+**Conseguenze:** TROVATEMI viene instradato a `trovatemi-os`; RankEmpire possiede la factory;
+`climbo-audit` resta evidence layer; D1 possiede lead/asset/stati designati; Climbo resta downstream
+nella corsia high-ticket. `aios-intake.md` e i documenti TROVATEMI precedenti sono snapshot storici.
+Il portfolio include anche il sistema autonomo `soliwkr/esim` e il prodotto pubblico
+`senzaroaming.it`, instradati alle fonti proprietarie e indipendenti da TROVATEMI. Sono istituiti
+registri di sistemi, capability e connessioni, più un ordine esplicito delle fonti.
+
+**Alternative considerate:** mantenere Soliwkr come AIOS solo TROVATEMI; rendere Hermes o Claude
+il centro del sistema; inglobare repository e dati in un monorepo. Scartate perché creano lock-in,
+autorità concorrenti e fragilità al cambio di strumento.
+
+**Gate:** Chris mantiene l'approvazione su identità, offerte, prezzi, promesse, procedure, domini,
+deploy previsti, messaggi sensibili, contratti, conversioni, fonti normative e irreversibilità.
+
+**Owner:** Chris.
 
 ---
 

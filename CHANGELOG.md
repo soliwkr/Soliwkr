@@ -5,6 +5,34 @@ apportate al sistema, i file toccati, e le decisioni prese.
 
 ---
 
+## 2026-07-29 — PR 0: costituzione Operator & Portfolio AIOS
+
+### Cosa
+- Aggiunta la costituzione tool-agnostic `AGENTS.md` e subordinato `CLAUDE.md` come adapter.
+- Aggiunti governance di autorità, routing e snapshot storici.
+- Aggiunti registri di sistemi/repository, capability e connessioni.
+- Separati AIOS, business OS, runtime, interfacce, workflow deterministici e datastore.
+- Registrati i due livelli Climbo, D1-first, Hermes futuro e gate umani.
+- Registrato il sistema autonomo `soliwkr/esim`, il prodotto pubblico `senzaroaming.it` e la
+  capability di routing `operate-esim-product`, senza copiarne documenti o stato.
+- Classificato l'intake del 2026-07-16 come snapshot non automaticamente canonico.
+- Adeguate le skill Claude legacy per non sovrascrivere governance o implementare capability altrui.
+
+### Perché
+Soliwkr deve essere la mappa portabile dell'operatore e del portfolio, non una copia del business OS
+TROVATEMI o un runtime legato a Claude. Le autorità e la memoria devono sopravvivere al cambio di
+agente, interfaccia e adapter.
+
+### File toccati
+`AGENTS.md`, `CLAUDE.md`, `ARCHITECTURE.md`, `EXPANSIONS.md`, `aios-intake.md`, `connections.md`,
+`governance/*`, `registries/*`, `.claude/skills/*/SKILL.md`, `decisions/log.md`, `CHANGELOG.md`.
+
+### Azioni successive
+Verificare nei repository proprietari l'ordine TROVATEMI, i contratti D1 e lo stato reale delle
+connessioni; non consolidare o copiare tali fonti in Soliwkr.
+
+---
+
 ## 2026-07-16 (sessione sera) — Brief mattutino Google Chat + Tasks, config Climbo ★ TROVATO, memoria nel repo
 
 ### Cosa

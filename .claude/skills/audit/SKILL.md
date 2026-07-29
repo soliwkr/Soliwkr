@@ -5,7 +5,9 @@ description: Use when someone asks for an AIOS audit, asks to score their setup 
 
 ## What this skill does
 
-Runs the **Four Cs Audit** on the current Claude Code project. Reads (never writes) the project's operating manual, memory, skills, agents, MCPs, decisions, and references. Scores each of the Four Cs out of 25. Surfaces strengths and the top 3 leverage-weighted gaps with concrete next-step commands.
+Runs a legacy **Four Cs Audit** as a Claude adapter. Read `AGENTS.md` first and evaluate portable
+governance, registries, memory, decisions and routing before Claude-specific skills or MCPs.
+Installed skills are adapters, not the complete Capability Registry.
 
 **Scope is structural — "is the AIOS built right?"** It is NOT a capability planner. Capability gaps ("you could build a daily brief if you connected calendar") belong to `/level-up`. The audit answers: are the files, folders, registries, and connections in good shape?
 
@@ -31,7 +33,7 @@ First run is the baseline. Re-run weekly to watch the score climb. That's the co
 
 The audit looks for **patterns and intent**, not exact paths. File names vary. Use Glob and Read to check:
 
-**Operating manual:** `CLAUDE.md` (root), `CLAUDE.local.md` (gitignored).
+**Operating constitution:** `AGENTS.md` (root). **Adapter:** `CLAUDE.md`.
 **Memory:** `MEMORY.md` (root), `~/.claude/projects/<id>/memory/MEMORY.md`, or `memory/` folder.
 **Skills:** `.claude/skills/*/SKILL.md` — count + frontmatter.
 **Agents:** `.claude/agents/*.md` — count + frontmatter.
@@ -41,7 +43,9 @@ The audit looks for **patterns and intent**, not exact paths. File names vary. U
 - Export pipelines: `data/`, `imports/`, `exports/` with refresh script + last-run timestamp
 - API keys + reference guide: `.env` entries + corresponding `references/{tool}-api.md`
 
-**Connections registry:** `connections.md` (anywhere).
+**Connections registry:** `registries/connections.md`; `connections.md` is a compatibility index.
+**Capabilities registry:** `registries/capabilities.md`.
+**Systems/routing:** `registries/systems.md`, `governance/routing.md`.
 **Reference guides:** `references/{tool}-api.md`, `references/*-reference.md`, or equivalent.
 **Decisions:** `decisions/log.md`, `decisions.md`, or any append-only decisions file.
 **References / SOPs:** `references/`, `docs/`, `sops/` folders.
@@ -56,8 +60,8 @@ Don't penalize for non-canonical names if equivalent intent is captured elsewher
 
 | Criterion | Points | How to detect |
 |---|---|---|
-| Operating manual exists and is substantive (>200 words) | 5 | Read CLAUDE.md, count words |
-| Identity / role / voice captured | 5 | CLAUDE.md mentions who the user is + role/mission, OR `.claude/rules/*.md` exists |
+| Operating constitution exists and is substantive (>200 words) | 5 | Read AGENTS.md, count words |
+| Identity / role / voice captured | 5 | AGENTS.md/context captures operator role and portable rules |
 | Persistent memory exists with multiple entries | 5 | MEMORY.md exists with >3 entries, OR `memory/` has >3 files |
 | Reference docs exist | 5 | `references/`, `docs/`, or `sops/` has ≥1 file |
 | Decisions captured | 5 | `decisions/log.md` or equivalent has ≥1 entry |
@@ -85,16 +89,16 @@ A "reachable" connection counts via ANY mechanism: MCP, script, export pipeline,
 | Tier-1 domain coverage | 10 | 1.4 pts per tier-1 domain reachable. Round to nearest 0.5. Cap 10. |
 | Reference guide presence | 5 | -1 per connected tool with no `references/{tool}-api.md`. Floor 0. |
 | Auth / pipeline freshness | 5 | -1 per connection in `needs-auth`/`expired` state, or script with no run within 30 days. Floor 0. |
-| Documentation in `connections.md` | 3 | 0 if missing; 1 sparse; 2 most; 3 covers all reachable. |
+| Documentation in `registries/connections.md` | 3 | 0 if missing; 1 sparse; 2 most; 3 covers all reachable. The root compatibility index does not count. |
 | Read-AND-write balance | 2 | At least one connection can WRITE (send email, post update, etc.). 0 if all read-only — the AIOS is a viewer not an OS. |
 
 #### Capabilities (25 pts)
 
 | Criterion | Points | How to detect |
 |---|---|---|
-| 3+ skills installed | 10 | Count `.claude/skills/*/SKILL.md` |
-| 1+ user-built skill | 10 | Skill names not in: `onboard`, `audit`, `level-up`, `skill-creator`, `skill-builder`, `decision`, `connect`, `connect-check`, `memory-prune`, `scaffold-skill`, `scaffold-agent`, `draft`, `standup` (canonical AIS-OS + Anthropic shipped skills) |
-| 1+ agent defined | 5 | Count `.claude/agents/*.md` ≥ 1 |
+| Capability Registry exists and is populated | 10 | Read `registries/capabilities.md` |
+| Capabilities declare owner/source/gates/logs | 10 | Validate the registry schema and entries |
+| Adapter/runtime separation is explicit | 5 | Skills/agents do not claim authority by installation |
 
 #### Cadence (25 pts)
 
