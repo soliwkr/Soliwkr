@@ -1,5 +1,10 @@
 # AIS-OS Intake
 
+> **SNAPSHOT STORICO — 2026-07-16.** Questo intake descrive il precedente modello TROVATEMI e non
+> è più una fonte normativa o commerciale. Non può aggiornare automaticamente `AGENTS.md`,
+> `governance/`, `registries/` o fonti di un business. Per lo stato corrente seguire
+> `governance/source-of-truth.md`; il contenuto sotto è preservato integralmente come storia.
+
 This is the source-of-truth file for your AIOS. Fill it in by typing, voice-pasting (Wispr Flow / OS dictation), or running `/onboard` for a guided conversation. Whichever mode, this file is what `/onboard` reads to scaffold your Day-1 setup.
 
 **Hard cap: 7 questions.** Each answerable in under 60 seconds. Don't overthink — you can edit and re-run `/onboard` any time.

@@ -1,6 +1,6 @@
 ---
 name: level-up
-description: Use weekly to find and ship one new automation. Walks the 3Ms interview — Mindset (find the candidate) → Method (scope one) → Machine (build it). Trigger on "let's level up", "what should I automate next", "find me leverage this week", or as a Friday ritual. One run = one shipped artifact.
+description: Legacy Claude adapter for the 3Ms interview; routes proposals and artifacts to the owning system without becoming the canonical capability.
 ---
 
 > *Adapted from The Three Ms of AI™. © 2026 Nate Herk. All rights reserved.*
@@ -26,11 +26,15 @@ This is the brain-rewire mechanism. The kit doesn't need cron jobs to anchor beh
 
 ## Inputs the skill reads
 
+- `AGENTS.md` — portable constitution and human gates
+- `registries/capabilities.md` — registered capabilities and owners
+- `registries/systems.md` + `governance/routing.md` — destination and authority
 - `context/priorities.md` — what the user said matters
 - `context/about-me.md` — top_pain, role
-- `connections.md` — what's reachable, by what mechanism
+- `registries/connections.md` — canonical connection registry and adapter status
 - `references/3ms-framework.md` — the framework (used to quote principles back)
-- `decisions/log.md` — recent decisions (what's already shipped or considered)
+- the owning domain's decisions log — recent domain decisions
+- `decisions/log.md` — constitutional and genuinely cross-project decisions only
 - `.claude/skills/*/SKILL.md` frontmatter — what capabilities exist
 - Recent `audits/audit-{date}.md` if present
 
@@ -60,7 +64,7 @@ User picks one candidate. Walk the 5-step Method pipeline:
 **Step 1 — Find the constraint.** Which bottleneck does this solve, or which growth lever does it open? Tie back to Phase 1 answers.
 
 **Step 2 — EAD: Eliminate / Automate / Delegate.**
-- **Eliminate first:** *"What happens if we just stop doing this?"* If the answer is "nothing breaks" → skill exits cheerfully. *"Don't automate waste."* This is a win, log to `decisions/log.md` and stop.
+- **Eliminate first:** *"What happens if we just stop doing this?"* If the answer is "nothing breaks" → skill exits cheerfully. *"Don't automate waste."* This is a win: propose logging it in the owning domain and stop.
 - **Automate second:** apply 60/30/10 framing. ~60% deterministic, ~30% AI-assisted, ~10% manual.
 - **Delegate third:** if too complex/variable/judgment-heavy → suggest a person. Skill exits with a delegation suggestion, log it.
 
@@ -92,7 +96,9 @@ If the user can't articulate any of the five: *"If you can't explain it to a per
 
 Plus a specific metric (response time, error rate, conversion rate, time-to-completion). **If the user can't name a bucket and a metric, skill stops.** *"If your automation doesn't move a number, why are you building it?"*
 
-**Output of Phase 2:** scoped automation spec written to `decisions/log.md` as a dated entry with all five answers + autonomy level + KPI. Durable record of what was decided and why.
+**Output of Phase 2:** scoped proposal routed to the decisions log of the owning domain. Use
+`decisions/log.md` only when the decision is genuinely cross-project. Include all five answers,
+autonomy level, KPI, source and human gate.
 
 ### Phase 3 — Machine handoff (build it)
 
@@ -105,7 +111,7 @@ Ask: *"How do you want to ship this?"* Options ordered by Boring-is-Beautiful de
 
 **Default selected = highest non-AI option that solves the problem.** User has to explicitly choose more autonomy.
 
-Once chosen, route to the appropriate scaffolder:
+Once chosen, route to the owning system and then to an appropriate, replaceable scaffolder:
 - `skill-creator` if available globally (Anthropic-shipped)
 - `skill-builder` if user has it locally
 - Otherwise write a SKILL.md / agent file inline with frontmatter, location, and contents
@@ -129,22 +135,26 @@ Surface the Machine principles when scaffolding:
 
 ## Output contract
 
-Every `/level-up` run produces:
+Every `/level-up` run proposes:
 
-1. **One `decisions/log.md` entry** — dated, with the Method spec
-2. **One scaffolded artifact** — prompt, skill, or agent file
+1. **One decision entry** for the owning domain — dated, with the Method spec; use Soliwkr's log
+   only for a constitutional or genuinely cross-project decision
+2. **One artifact** in the owning system — prompt, skill, or agent file, only after approval
 3. **A one-screen close** — what was scoped, what was built, and the Bike Method Phase 1 reminder
 
 ## Critical implementation rules
 
 1. **One interview = one artifact.** No multi-candidate parallel scoping.
+1a. **Registry is not implementation.** A Claude skill is one possible adapter, not the capability.
+1b. **Respect ownership.** Do not implement another repository's capability inside Soliwkr.
 2. **Mindset phase always runs first.** Even if user comes in with a pre-formed idea.
 3. **EAD enforces "eliminate first."** If the answer is Eliminate, exit cheerfully — that's a win, not a failure.
 4. **Default to the lowest autonomy level that works.** Push back on L4.
 5. **Boring-is-Beautiful default in Machine handoff.** Default = highest non-AI option.
 6. **Tie-to-KPI is mandatory.** If user can't name bucket + metric, skill stops.
 7. **Bike Method ships into every artifact.** `bike-method-phase: 1` in frontmatter.
-8. **Read-only on user files except `decisions/log.md` and the new artifact.** Don't modify other existing files.
+8. **Read-only until approval.** Write a decision or artifact only in the owning system and only
+   after the applicable human gate.
 9. **Trademark + attribution on output.** Every report and every scaffolded artifact references the framework.
 
 ## Verification (for the implementer)

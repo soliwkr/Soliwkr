@@ -1,4 +1,8 @@
-# EXPANSIONS — what to add as you grow
+# EXPANSIONS — guida legacy di crescita
+
+> **Stato:** snapshot del kit AIS-OS originario. `AGENTS.md` e `governance/` prevalgono. Le regole
+> che rendono `aios-intake.md` o `CLAUDE.md` fonti canoniche sono deprecate; i business verticali
+> restano repository/sistemi autonomi registrati in Soliwkr, non sub-OS incorporati.
 
 The kit ships lean on purpose. Three skills, six folders, one framework reference. That's it. As you use it, you'll outgrow the base — this guide tells you what to add, when, and why.
 
@@ -10,14 +14,16 @@ The AIOS structure should look like a small, well-run business. Not a hoarder's 
 
 | Folder / file | Purpose |
 |---|---|
-| `context/` | About you, your business, your priorities. Filled by `/onboard`. |
+| `context/` | Historical context snapshots; onboarding may only propose explicitly gated profile changes. |
 | `references/` | Frameworks, voice samples, API guides, SOPs as you build them. |
 | `decisions/log.md` | Append-only record of what was decided and why. |
 | `archives/` | Old files. Don't delete — move here. |
-| `connections.md` | Registry of every system your AIOS can reach. |
+| `registries/connections.md` | Canonical registry of systems the AIOS can reach and their adapters. |
+| `connections.md` | Compatibility index only; do not populate it as a registry. |
 | `.claude/skills/` | Your skills: `/onboard`, `/audit`, `/level-up`. Add more via `/level-up`. |
-| `aios-intake.md` | Source-of-truth for `/onboard`. Edit and re-run any time. |
-| `CLAUDE.md` | Root operating manual. Filled by `/onboard`. Edit when your role/voice changes. |
+| `aios-intake.md` | Historical onboarding snapshot; not a current source of truth. |
+| `AGENTS.md` | Canonical, tool-agnostic operating constitution. |
+| `CLAUDE.md` | Claude adapter subordinated to `AGENTS.md`. |
 
 ---
 
@@ -32,7 +38,7 @@ The AIOS structure should look like a small, well-run business. Not a hoarder's 
 | `references/{tool}-api.md` | You connect a new API or MCP and figure out how it works | Researched-once-saved-forever. `/audit` rewards this; future skills don't re-research. |
 | `scripts/` | You write Python or Bash to hit APIs not covered by MCPs | Most people's second connection is a script, not an MCP |
 | `.claude/agents/` | You need a sub-assistant for repeatable, multi-step research/writing | Agents run on cheaper models in their own context — keep your main session lean |
-| Sub-OS folders (e.g. `youtube-os/`) | You have a vertical with its own data, sheets, transcripts, scripts | Isolation pattern — vertical workflows get their own scoped operating manual + skills |
+| External system/repository registry entries | A vertical has its own authority or datastore | Preserve isolation and route to it without embedding it in Soliwkr |
 
 ---
 
@@ -40,12 +46,12 @@ The AIOS structure should look like a small, well-run business. Not a hoarder's 
 
 When each surface gets routinely touched:
 
-- `decisions/log.md` — every meaningful decision (`/level-up` Phase 2 captures these automatically)
+- `decisions/log.md` — constitutional and genuinely cross-project decisions only; `/level-up` may propose an entry
 - `archives/` — quarterly cleanup; move stale projects, deprecated skills, old intake versions
 - `references/sops/` — when a process gets re-run by someone new, write the SOP
-- `connections.md` — every time a new tool gets wired in, add a row
-- `references/{tool}-api.md` — same time as `connections.md` update; capture the API once
-- `CLAUDE.md` — quarterly review; rewrite the persona/priorities section after `/level-up` Q90
+- `registries/connections.md` — update the canonical entry when a connection or adapter changes
+- `references/{tool}-api.md` — capture implementation research without creating another registry
+- `AGENTS.md` — review only when an approved constitutional decision requires it
 
 ---
 
@@ -58,7 +64,8 @@ Anti-patterns. These look helpful but rot the structure:
 - **Don't add `notes/`, `misc/`, `tmp/`, or `inbox/`.** Graveyards. Use `archives/` if it's old, write a real file in the right place if it's new.
 - **Don't pre-create folders you don't need yet.** Empty folders are noise. The AIOS will tell you when it's time.
 - **Don't have parallel `decisions.md` and `decisions/log.md`.** Pick one. The kit ships `decisions/log.md`.
-- **Don't fork your operating manual.** One `CLAUDE.md` at the root. Sub-OS folders can have their own scoped CLAUDE.md, but the root is canonical.
+- **Don't fork the constitution.** `AGENTS.md` is canonical; product-specific adapter files are
+  subordinate and replaceable.
 
 ---
 

@@ -1,32 +1,37 @@
 ---
 name: onboard
-description: Use on Day 1 of an AIS-OS install, when someone says "set me up", "onboard me", "let's get started", "fill in my AIOS", or has just cloned the kit. Combined wizard — runs the 7-question intake AND scaffolds the Day-1 file set at the end. Idempotent — re-run any time after editing aios-intake.md.
+description: Legacy Claude onboarding adapter. Use only to extract a proposed operator profile from an intake; never promote the historical intake into canonical governance or business truth.
 ---
 
 ## What this skill does
 
-Single combined wizard. Reads or writes `aios-intake.md` (the canonical intake), conducts the 7-question interview if the file isn't filled, then scaffolds the Day-1 file set inline at the end of the run. No separate `/scaffold-from-intake` skill — this is one flow.
+This is a legacy Claude adapter retained for history. Read `AGENTS.md` first. `aios-intake.md` is a
+historical snapshot, not a canonical intake. A future onboarding may extract a **proposal**, compare
+it with the domain's authority and request Chris's approval; it must not scaffold or overwrite
+normative files automatically.
 
-**The wow moment:** at the end, suggest the closing prompt *"Try this — ask me: what should I focus on this week?"* The user runs it once. That's the wow. There's no `/today` skill to save — the prompt itself plants the Mindset framework (Default Shift) for them to internalize.
+The output is a conversational proposal. It is not an automatic scaffold.
 
 ## When NOT to run this
 
-- If the user has already onboarded and wants to refresh: still run, but skip questions already answered (idempotent).
-- If the user wants to add a new connection: that's not onboarding — point them at `connections.md` to edit directly, or schedule a `/level-up` Phase 2 walk.
+- If the user wants to edit the historical intake: refuse; `aios-intake.md` is read-only.
+- If the user wants to add a connection: prepare a proposal against
+  `registries/connections.md`; do not edit the compatibility index.
 
 ## Execution
 
-### Step 1: Read the intake
+### Step 1: Read authority, then the intake
 
-Read `aios-intake.md`. Check which Q1-Q7 sections have content vs. `[Your answer here]` placeholders.
+Read `AGENTS.md`, governance and registries before `aios-intake.md`. Check which Q1-Q7 sections
+have content, but classify every extracted claim by owner, date and authority.
 
-- **All filled** → skip Step 2, jump to Step 3 (scaffold).
-- **Some filled** → ask the user: "I see Q1, Q3, Q4 are answered. Want to fill the rest now, or scaffold from what's there?" Their call.
-- **None filled (fresh clone)** → run Step 2 conversationally.
+- Treat existing answers only as historical context, regardless of completeness.
+- Ask which facts Chris wants to reconsider now; do not infer that historical answers remain current.
 
 ### Step 2: The interview (7 questions, hard cap)
 
-Ask one at a time. Write each answer into `aios-intake.md` as you go (so the user can resume if interrupted).
+Ask one at a time and retain answers only in the active conversation. Do not write them to
+`aios-intake.md` or any other file during the interview.
 
 **Q1 — Who are you, what do you sell, who do you sell it to?**
 Identity, offer, ICP. One paragraph each is fine.
@@ -55,30 +60,34 @@ Capture top_pain (used by `/level-up` Day-14) + Domain 5 (tasks).
 
 Domain 3 (Calendar) is auto-inferred from Q5: Gmail → Google Cal; Outlook → Outlook Cal. Confirm in Step 3.
 
-### Step 3: Scaffold the Day-1 file set
+### Step 3: Prepare a proposed Day-1 change set
 
-Once the intake is complete, generate these files (or update if re-running). Back up originals to `archives/intake-{YYYY-MM-DD-HHMM}/` if any exist.
+Once the conversation is complete, show a proposed change set, owning domains, conflicts, risks and
+acceptance criteria. Do not write until Chris approves it. Never update `aios-intake.md`,
+`AGENTS.md`, `governance/`, `registries/`, adapters or business sources from onboarding. After
+approval, change only the explicitly named, non-normative profile files.
 
-1. **`context/about-me.md`** — from Q1 (identity, role) + Q7 (top_pain). One short paragraph each.
-2. **`context/about-business.md`** — from Q1 (offer, ICP) + Q4 (revenue model). One paragraph.
-3. **`context/priorities.md`** — from Q3. Numbered list, one line per priority.
-4. **`references/voice.md`** — from Q2. Paste samples verbatim with a short header explaining their use ("Match this register when drafting; don't fake voice on external content without showing me first").
-5. **`connections.md`** — populate the 7-row table from Q4-Q7 answers. Each row gets `mechanism: not yet connected`, `auth: —`, `last checked: —`. The user wires connections on Day 2.
-6. **`CLAUDE.md`** — fill all `{{...}}` placeholders. Substitute the user's name, stated priority, voice register summary, and a brief connections summary.
+1. **`context/about-me.md`** — possible non-normative operator profile, only if explicitly approved.
+2. **`references/voice.md`** — possible non-normative voice profile, only if explicitly approved.
+3. **Business and priorities** — route proposals to the owning domain; onboarding does not modify
+   business sources or historical context snapshots.
+4. **Connections** — propose registry changes separately; onboarding does not write either
+   `registries/connections.md` or the root compatibility index.
+5. **Adapters** — do not regenerate or modify `CLAUDE.md` or any future adapter.
 
-### Step 4: The closing screen
+### Step 4: The proposal screen
 
 Print one screen. Three lines max:
 
 ```
-✓ Day 1 done. Your AIOS knows who you are, what you sell, what matters this quarter, and how you sound.
+✓ Proposal ready. No repository source has been changed.
 
-Today: ask me — "what should I focus on this week?"
-Tomorrow: pick one tool from connections.md and wire it up (manual MCP install or write a small API script + save references/{tool}-api.md).
-Day 7: run /audit to see your score.
+Review the proposed non-normative profile changes and conflicts.
+Approve the exact files to update, or reject the proposal.
 ```
 
-When the user runs the closing prompt ("what should I focus on this week?"), respond using only the new context files. Hit:
+If Chris later asks what to focus on, use only approved current sources. Do not treat the
+conversation or proposed profile as canonical before approval. Hit:
 - 3-bullet priority list, in their voice register from Q2
 - Each bullet ties back to a stated 90-day priority from Q3
 - Final line: *"If I had to pick one thing for Monday, it'd be [X], because [reason from priorities]. Want me to draft the first email? And — where could the Default Shift apply here? To what extent could AI be leveraged on this task?"*
@@ -89,17 +98,25 @@ The Default Shift question seeds the Mindset framework before `/level-up` formal
 
 1. **The 7-question cap is non-negotiable.** Don't add Q8 in conversation.
 2. **Voice paste cannot be skipped.** If the user types samples mid-chat, refuse and tell them to paste from real writing.
-3. **One-shot scaffold.** After Step 2 ends, write Step 3 files in a single batch. No multi-turn confirmation. The user iterates by editing `aios-intake.md` and re-running.
-4. **Idempotent.** Re-running with an edited intake refreshes context files; backs up originals to `archives/intake-{ts}/`. Skips questions already answered unless the user wants to revise.
+3. **Approval required.** After Step 2, present a proposal and conflicts, then wait before writing
+   any explicitly authorized non-normative profile file.
+4. **No automatic refresh.** Re-running never promotes an intake claim over an approved source.
 5. **Closing screen is three lines.** Not a menu.
 6. **No extra skills generated.** Don't scaffold `/today`, `/draft`, `/connect`, etc. The kit ships 3 skills; the user authors more via `/level-up`.
 7. **Read-only on `references/3ms-framework.md`.** It already ships in the kit. Don't overwrite.
 8. **No `.env` writes.** Don't ask for API keys on Day 1. Connections come Day 2.
+9. **Protected read-only files.** Never write `aios-intake.md`, `AGENTS.md`, governance, registries,
+   adapters or business sources.
 
 ## Verification (for the implementer)
 
-- Cold-test: clone a fresh kit, run `/onboard`, fill 7 answers, scaffold runs, ask the wow prompt, response cites Q1 + Q3 + Q7 specifically. Generic = fail.
-- Idempotency: re-run `/onboard` with one Q3 priority changed. Expected: only `context/priorities.md` and `CLAUDE.md`'s priority section update; backup created in `archives/intake-{ts}/`.
+- Proposal test: run `/onboard`, answer 7 questions, and verify that the output is only a proposal
+  with conflicts, owners and exact non-normative target files; the working tree remains unchanged.
+- Approval test: after Chris approves exact profile files, verify that only those non-normative
+  files change. `aios-intake.md`, `AGENTS.md`, governance, registries, adapters and business sources
+  remain byte-for-byte unchanged.
+- Re-run test: change a conversational answer and verify that no file changes before a new explicit
+  approval; no archive backup or automatic refresh is expected.
 - Voice rejection: type a sample mid-chat. Expected: skill refuses, asks for paste.
 
 > *Adapted from The Three Ms of AI™ © 2026 Nate Herk. The Mindset language used in the closing screen comes from `references/3ms-framework.md`.*
