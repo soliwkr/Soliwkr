@@ -1,0 +1,36 @@
+# Soliwkr — Operator & Portfolio AIOS
+
+Questo repository è l'**office canonico** dell'AIOS personale di Chris: costituzione, governance, registry, routing, decisioni cross-project e playbook.
+
+Non contiene fisicamente gli altri repository e non sostituisce le fonti canoniche dei singoli progetti.
+
+## Workspace locale canonico
+
+```text
+~/AIOS/
+├── office/      # clone di soliwkr/Soliwkr
+└── projects/    # clone separato di ogni progetto
+```
+
+`~/AIOS` è una cartella workspace, non un repository Git.
+
+## Leggi in questo ordine
+
+1. [AGENTS.md](AGENTS.md)
+2. [governance/source-of-truth.md](governance/source-of-truth.md)
+3. [governance/routing.md](governance/routing.md)
+4. [governance/development-canon.md](governance/development-canon.md)
+5. [registries/systems.md](registries/systems.md)
+6. [registries/capabilities.md](registries/capabilities.md)
+7. [registries/connections.md](registries/connections.md)
+8. [registries/cloudflare-starters.md](registries/cloudflare-starters.md)
+
+## Canon di sviluppo
+
+- **Cloudflare-first, mai Cloudflare-at-all-costs.**
+- **Template-first:** prima di codice greenfield si esegue lo Starter Gate.
+- GitHub conserva il codice e lo stato durevole del repository.
+- Ogni progetto resta un repo autonomo.
+- Editor, modelli e agenti sono sostituibili.
+
+Vedi [governance/development-canon.md](governance/development-canon.md) e [playbooks/new-project-bootstrap.md](playbooks/new-project-bootstrap.md).

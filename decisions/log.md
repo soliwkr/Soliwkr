@@ -94,3 +94,29 @@ deploy previsti, messaggi sensibili, contratti, conversioni, fonti normative e i
 **Why:** coerente con lo stack edge-only Cloudflare; R2 è storage durevole e a basso costo, la VPS non è il posto giusto per accumulare registrazioni. Non è lavoro di questa settimana.
 
 **Owner:** Chris.
+
+
+---
+
+## 2026-10-01 — Cloudflare-first e template-first diventano canon cross-project
+
+**Decisione:** Cloudflare è la piattaforma di sviluppo e produzione predefinita per i nuovi progetti,
+senza diventare un vincolo assoluto. Prima di scrivere codice applicativo greenfield è obbligatorio
+eseguire lo Starter Gate: template/starter ufficiale Cloudflare, repository/reference ufficiale,
+starter ufficiale del framework compatibile, repository affermato e mantenuto, adattamento/fork;
+solo come ultima scelta si parte da zero con motivo documentato.
+
+**Why:** standardizzare riduce frammentazione, setup ripetuti e codice già risolto. Cloudflare offre
+un percorso coerente tra local development, Workers e binding di piattaforma, mentre l'escape hatch
+VPS/Docker/Postgres evita di piegare la piattaforma a workload non adatti. L'inventario deve restare
+vivo perché template e percorsi raccomandati cambiano.
+
+**Conseguenze:** `governance/development-canon.md` governa lo sviluppo cross-project;
+`registries/cloudflare-starters.md` è il catalogo di partenza; ogni nuovo progetto registra la
+provenienza dello starter e le deviazioni. Il workspace locale resta `~/AIOS/office + projects`,
+non un monorepo Git: ogni progetto mantiene il proprio repository.
+
+**Alternative considerate:** scegliere piattaforma/framework da zero per ogni progetto; Cloudflare-only;
+un monorepo che inglobi tutti i business. Scartate perché aumentano drift, lock-in o accoppiamento.
+
+**Owner:** Chris.
