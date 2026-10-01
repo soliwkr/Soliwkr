@@ -34,3 +34,19 @@ Non contiene fisicamente gli altri repository e non sostituisce le fonti canonic
 - Editor, modelli e agenti sono sostituibili.
 
 Vedi [governance/development-canon.md](governance/development-canon.md) e [playbooks/new-project-bootstrap.md](playbooks/new-project-bootstrap.md).
+
+
+## Documentazione leggibile su Google Drive
+
+Mirror umano: **AIOS — Canonical Office**  
+https://drive.google.com/drive/folders/1FlfCLsZlws1hri9k048iDjSp_plE0ZSg
+
+Contiene:
+- `00 — Canon/AIOS — Canon e Architettura`
+- `10 — Cloudflare/New Project Bootstrap — SOP`
+- `10 — Cloudflare/Cloudflare — Starter & Repository Inventory`
+- `20 — Projects` per documentazione umana dei singoli progetti quando serve
+- `90 — Archive`
+
+La documentazione Drive è una superficie leggibile e collaborativa. In caso di conflitto, le fonti
+normative e machine-readable nel repository e nei sistemi proprietari prevalgono.
