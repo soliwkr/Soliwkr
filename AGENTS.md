@@ -28,10 +28,12 @@ la loro indipendenza, autorità e repository proprietario restano invariati.
 - `AGENTS.md` — costituzione e istruzioni portabili.
 - `governance/source-of-truth.md` — ordine delle autorità e risoluzione dei conflitti.
 - `governance/routing.md` — confini dei layer e routing tra sistemi.
+- `governance/development-canon.md` — standard cross-project: Cloudflare-first, Starter Gate e workspace.
 - `governance/historical-snapshots.md` — documenti legacy e loro autorità residua.
 - `registries/systems.md` — sistemi, repository, owner e confini.
 - `registries/capabilities.md` — capacità disponibili o pianificate.
 - `registries/connections.md` — connessioni astratte e adapter sostituibili.
+- `registries/cloudflare-starters.md` — inventario vivo di template, starter e reference Cloudflare.
 - `decisions/log.md` — decisioni approvate, append-only.
 - `CLAUDE.md` — solo adapter Claude.
 
@@ -62,6 +64,7 @@ Prima di lavorare:
 
 1. leggi questo file e i documenti di governance applicabili;
 2. identifica il dominio proprietario e la sua fonte canonica;
+2a. se il task crea o reimposta software, leggi `governance/development-canon.md` ed esegui lo Starter Gate prima del codice greenfield;
 3. dichiara scope, assunzioni, rischi e criteri di accettazione;
 4. segnala ogni conflitto invece di scegliere silenziosamente una fonte;
 5. usa il minimo privilegio e non registrare valori segreti;
