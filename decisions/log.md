@@ -136,3 +136,25 @@ un monorepo che inglobi tutti i business. Scartate perché aumentano drift, lock
 **Alternative considerate:** monorepo dentro `soliwkr/Soliwkr`; BLACK OFFICE e WORKPRINT nello stesso repo; D1 condiviso con un progetto esistente; starter community. Scartate per violazione del canon, accoppiamento, rischio dati e minore supportabilità.
 
 **Owner:** Chris.
+
+
+---
+
+## 2026-10-04 — L'acquisizione diventa parte del loop economico di BLACK OFFICE
+
+**Decisione:** BLACK OFFICE possiede il modello economico dell'acquisizione
+`TrafficHypothesis → Creative → Publication → SourceMetrics → Attributed Funnel → Decision`.
+WORKPRINT resta proprietario del prodotto e del fulfillment; i canali esterni restano proprietari
+delle pubblicazioni e delle metriche native; Stripe resta payment truth. Soliwkr conserva soltanto
+la mappa cross-project delle autorità.
+
+**Why:** misurare solo dal click in avanti lascia il business senza un motore di distribuzione e
+impedisce di attribuire revenue a un'idea/creative. Centralizzare invece tutte le verità in BLACK
+OFFICE produrrebbe copie concorrenti di Stripe, social, prodotto e codice. La nuova mappa chiude il
+loop economico senza confondere ownership.
+
+**Autonomia V0:** BLACK OFFICE può proporre e misurare hook/creative e allocazioni bounded già
+autorizzate. La pubblicazione esterna, nuovi account, paid ads, brand/domain e source-code changes
+restano gated.
+
+**Owner:** Chris.
