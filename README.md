@@ -18,12 +18,13 @@ Non contiene fisicamente gli altri repository e non sostituisce le fonti canonic
 
 1. [AGENTS.md](AGENTS.md)
 2. [governance/source-of-truth.md](governance/source-of-truth.md)
-3. [governance/routing.md](governance/routing.md)
-4. [governance/development-canon.md](governance/development-canon.md)
-5. [registries/systems.md](registries/systems.md)
-6. [registries/capabilities.md](registries/capabilities.md)
-7. [registries/connections.md](registries/connections.md)
-8. [registries/cloudflare-starters.md](registries/cloudflare-starters.md)
+3. [governance/acquisition-source-map.md](governance/acquisition-source-map.md)
+4. [governance/routing.md](governance/routing.md)
+5. [governance/development-canon.md](governance/development-canon.md)
+6. [registries/systems.md](registries/systems.md)
+7. [registries/capabilities.md](registries/capabilities.md)
+8. [registries/connections.md](registries/connections.md)
+9. [registries/cloudflare-starters.md](registries/cloudflare-starters.md)
 
 ## Canon di sviluppo
 
