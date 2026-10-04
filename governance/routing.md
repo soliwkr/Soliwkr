@@ -27,6 +27,10 @@ pianificato un adapter sostituibile. Se manca l'autorità, invece, l'operazione 
 | Evidenze e intelligence Climbo | `climbo-audit` | grezzi/elaborati; promozione solo dopo approvazione |
 | Strategia prodotto, architettura, roadmap, codice, SEO, editoriale e stato di Senzaroaming | `soliwkr/esim` | fonti canoniche del repository eSIM; non memorie o documenti TROVATEMI |
 | Lead, asset e relativi stati | Cloudflare D1 | registrazione D1-first prima del downstream |
+| Esperimenti economici e acquisition learning cross-asset | `soliwkr/black-office` | OfficeState, Director, Traffic Engine e policy bounded |
+| Prodotto WORKPRINT, assessment, report e entitlement | `soliwkr/workprint` | repo + runtime asset autonomo |
+| Pagamenti WORKPRINT | Stripe account WORKPRINT | Stripe è payment truth; WORKPRINT possiede fulfillment |
+| Pubblicazioni e metriche native social | provider del canale | BLACK OFFICE conserva riferimenti/snapshot normalizzati |
 | Conversazione operativa privata | Telegram inizialmente | interfaccia; decisioni registrate altrove |
 | Prospect, clienti e renter | WhatsApp | canale esterno; non fonte canonica |
 

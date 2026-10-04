@@ -48,6 +48,16 @@ report restano rappresentazioni derivate.
 
 Non copiare in Soliwkr ROADMAP, STATUS, NEXT, ARCHITECTURE, DECISIONS o altri documenti eSIM.
 
+## Acquisition e BLACK OFFICE
+
+Per acquisizione cross-asset e apprendimento economico, BLACK OFFICE possiede ipotesi di traffico,
+creative come record sperimentali, pubblicazioni normalizzate, event receipts, attribuzione e decisioni
+economiche. Il provider esterno resta autorevole per l'oggetto pubblicato e le proprie metriche native;
+Stripe resta autorevole per lo stato del pagamento; il repository dell'asset resta autorevole per il
+prodotto e il suo fulfillment.
+
+La mappa dettagliata è in [acquisition-source-map.md](acquisition-source-map.md).
+
 ## Stato operativo
 
 - D1 è il backbone canonico di lead, asset rank-and-rent e relativi stati operativi.
