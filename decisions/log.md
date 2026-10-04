@@ -120,3 +120,19 @@ non un monorepo Git: ogni progetto mantiene il proprio repository.
 un monorepo che inglobi tutti i business. Scartate perché aumentano drift, lock-in o accoppiamento.
 
 **Owner:** Chris.
+
+---
+
+## 2026-10-04 — BLACK OFFICE, WORKPRINT e pstack separano i poteri del sistema
+
+**Decisione:** BLACK OFFICE diventa l'economic control plane del portfolio e resta un progetto/repository autonomo. WORKPRINT resta un asset/repository autonomo e comunica con BLACK OFFICE tramite contratti ed eventi. `soliwkr/Soliwkr` resta l'Operator & Portfolio AIOS e registra routing, limiti e decisioni cross-project. `soliwkr/pstack` governa il modo in cui gli agenti modificano software, ma non entra nel runtime. Cloudflare esegue i componenti, non definisce policy.
+
+**Why:** il monorepo unico avrebbe violato il canon workspace del 2026-10-01 e confuso autorità. La separazione permette a BLACK OFFICE di auto-migliorare configurazioni ed esperimenti senza auto-concedersi poteri sul codice o sulla Constitution. pstack aggiunge una disciplina verificabile per ogni modifica sorgente. Il sistema è self-improving ma non self-governing.
+
+**Starter Gate:** BLACK OFFICE usa come base primaria `cloudflare/templates/workflows-starter-template`, integrando i pattern ufficiali `hello-world-do-template` per `OfficeState` SQLite. WORKPRINT usa `cloudflare/templates/react-router-hono-fullstack-template`. Sono state scartate basi community e starter SaaS più pesanti. Lo stato canonico V0.2 di BLACK OFFICE usa un Durable Object SQLite perché l'account Cloudflare ha già 10 database D1 e nessun database esistente viene cancellato o riutilizzato senza decisione esplicita.
+
+**Conseguenze:** Queue `black-office-events` e `black-office-events-dlq` sono state create sull'account Cloudflare. Il bootstrap BLACK OFFICE corregge l'idempotenza degli eventi e conteggia exposure/conversion sulle arm; l'LLM resta proposal-only. R2 con dati personali non viene creato finché non è configurata una giurisdizione appropriata. I repo remoti `soliwkr/black-office` e `soliwkr/workprint` restano da creare; fino ad allora i bootstrap locali non sono source of truth remoto.
+
+**Alternative considerate:** monorepo dentro `soliwkr/Soliwkr`; BLACK OFFICE e WORKPRINT nello stesso repo; D1 condiviso con un progetto esistente; starter community. Scartate per violazione del canon, accoppiamento, rischio dati e minore supportabilità.
+
+**Owner:** Chris.
