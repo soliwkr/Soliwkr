@@ -1,0 +1,18 @@
+{
+  "name": "il-varco",
+  "main": "./index.mjs",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "il-varco-mvp",
+      "database_id": "c0c849ea-cf2e-4bf6-aa4b-4efbd6532c43"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "20 7 * * *"
+    ]
+  }
+}
