@@ -1,3 +1,4 @@
+import { WIKI_CLI } from './wiki-cli-bundle.js';
 // Cloudflare Worker: user-initiated private Obsidian vault export (zero dependencies).
 const REPOS=[
   ['Soliwkr','soliwkr/Soliwkr'],['Black Office','soliwkr/black-office'],
@@ -21,7 +22,9 @@ function makeFiles(st,version,stamp){
  sourceLines.push('','## Inbox (testo dell’utente)');
  for(const [i,n] of (st.inbox||[]).entries())sourceLines.push('### Nota '+(i+1),s(n.text),'');
  const files={};
- files['README.md']=lines(['# SOLIWKR Wiki','', 'Apri questa cartella come vault in Obsidian e poi [[INDEX]]. Contiene dati privati esportati volontariamente.', 'Questo ZIP è uno snapshot: non sincronizza automaticamente Obsidian o gli agenti.', '', 'Regole per gli agenti: [[AGENTS]]. Fonti: cartella raw/. Note derivate: wiki/.']);
+ files['tools/wiki.mjs']=WIKI_CLI;
+
+ files['README.md']=lines(['# SOLIWKR Wiki','', 'Apri questa cartella come vault in Obsidian e poi [[INDEX]]. Contiene dati privati esportati volontariamente.', 'Sul laptop con Node.js 22+: node tools/wiki.mjs status --vault . ; node tools/wiki.mjs ingest ../mio-file.md --vault . ; aggiungi --apply solo dopo avere letto il piano. Sono disponibili anche query e lint.', 'Questo ZIP è uno snapshot: non sincronizza automaticamente Obsidian o gli agenti.', '', 'Regole per gli agenti: [[AGENTS]]. Fonti: cartella raw/. Note derivate: wiki/.']);
  files['AGENTS.md']=lines([
   '# SOLIWKR · LLM Wiki Agent Contract',
   '','## Ruoli e autorità',
@@ -29,7 +32,13 @@ function makeFiles(st,version,stamp){
   '- wiki/: pagine markdown mantenute da un agente dopo autorizzazione. Sono sintesi, non fonti normative.',
   '- INDEX.md: catalogo aggiornato durante ingest; LOG.md: audit append-only.',
   '- Il GitHub del singolo progetto e i sistemi di business conservano la rispettiva verità operativa.',
-  '','## Metodo Karpathy',
+  '','## CLI locale riproducibile',
+  'Node.js 22+ e nessun package esterno; vedi tools/wiki.mjs.',
+  'Esempio: node tools/wiki.mjs ingest /percorso/fonte.md --vault . (dry-run); poi --apply per creare raw e una bozza nella wiki.',
+  'Query: node tools/wiki.mjs query "ricerca" --vault . ; Lint: node tools/wiki.mjs lint --vault . ; Status: node tools/wiki.mjs status --vault .',
+  'La CLI crea solo bozze e ricerche letterali: non è un modello LLM, non si autoesegue.',
+  '',
+  '## Metodo Karpathy',
   '1. INGEST: scegli UNA nuova fonte raw; estrai affermazioni con provenienza, aggiorna le pagine wiki e i link giustificati, aggiorna INDEX e appendi LOG.',
   '2. QUERY: parti da INDEX, apri le note pertinenti, verifica le fonti raw e originali, separa fatti, ipotesi e desideri. Proponi un nuovo documento duraturo se serve.',
   '3. LINT: verifica wikilink non risolti, note isolate, duplicati, contraddizioni e informazioni superate. Prima mostra un rapporto; modifica solo wiki dopo approvazione.',
