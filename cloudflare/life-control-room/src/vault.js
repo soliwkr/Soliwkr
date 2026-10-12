@@ -13,7 +13,7 @@ const h=(kind,source,date)=>'---\nkind: '+kind+'\nsource: '+JSON.stringify(sourc
 const link=(folder,name)=>'[['+folder+name+'|'+name+']]';
 const lines=(arr)=>arr.join('\n')+'\n';
 const src=(file,p)=>'[snapshot](<'+p+file+'>)';
-function makeFiles(st,version,stamp){
+function makeFiles(st,version,stamp,knowledge=[]){
  const date=stamp.slice(0,10),snapshot='raw/snapshots/'+date+'-control-room-v'+version+'.md';
  const sourceLines=['# Snapshot Control Room','','Fonte: D1 privato SOLIWKR, versione '+version,'Osservato: '+stamp,'','## Focus',s(st.focus),'','## Le tre mosse'];
  for(const g of st.goals||[])sourceLines.push('- ['+(g.done?'x':' ')+'] '+s(g.text).replace(/\n/g,' / '));
@@ -115,6 +115,28 @@ function makeFiles(st,version,stamp){
   'Repository: https://github.com/'+slug,
   'Stato operativo, fatturato e utenti: non verificati in questo vault; consultare la fonte proprietaria.'
  ]);
+ // User-approved knowledge. Source snapshot is immutable unless deliberately erased by user.
+ const areaMap={corpo:'Corpo ed energia',relazioni:'Relazioni',fede:'Fede e interiorità',denaro:'Denaro e stabilità',progetti:'Lavoro e creazione',tempo:'Tempo e casa'};
+ for(const card of knowledge.slice(0,100)){
+  if(!/^[0-9a-f-]{36}$/i.test(card.id||''))continue;
+  const id=card.id,orig='raw/knowledge/'+id+'.md',note='wiki/Knowledge/'+id+'.md';
+  const category=card.domain==='studio'?'Studio':areaMap[card.domain]?'Aree/'+areaMap[card.domain]:'Cervello';
+  const title=s(card.title).replace(/\n/g,' ').slice(0,140)||'Memoria';
+  files[orig]=h('source_snapshot','D1 approved knowledge / note '+s(card.note_ref),card.created_at||stamp)+lines([
+    '# Fonte originale','',s(card.raw_text),'','SHA-256: '+s(card.sha256),
+    'Nota di origine: '+s(card.note_ref),'',
+    'Questa è la trascrizione dell’input; non una sintesi AI.'
+  ]);
+  files[note]=h(s(card.kind)||'observation',orig,card.created_at||stamp)+lines([
+    '# '+title,'','Collegato a [[Cervello]], [['+category+']], [[Life OS]].',
+    '','Stato: approvato manualmente dalla persona; NON verificato da un modello AI.',
+    '','Fonte originale: '+src(orig,'../../'),
+    'SHA-256 fonte: '+s(card.sha256),'',
+    '## Sintesi','_Da curare, senza inferenze automatiche._'
+  ]);
+  files['INDEX.md']+='\n- [['+note.slice(0,-3)+'|'+title+']] · conoscenza approvata, fonte '+orig;
+ }
+ if(knowledge.length)files['INDEX.md']+='\n';
  return files;
 }
 const encoder=new TextEncoder();
@@ -135,6 +157,6 @@ function zip(files){
  const cd=join(index),end=new Uint8Array(22);put(end,0,0x06054b50,4);put(end,8,names.length,2);put(end,10,names.length,2);put(end,12,cd.length,4);put(end,16,offset,4);
  return join([...bodies,cd,end]);
 }
-export function createVaultArchive(state,version,now){
- return zip(makeFiles(state,version,now.toISOString()));
+export function createVaultArchive(state,version,now,knowledge=[]){
+ return zip(makeFiles(state,version,now.toISOString(),knowledge));
 }

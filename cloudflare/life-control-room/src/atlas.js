@@ -50,7 +50,29 @@ function installGraph(){
  N.forEach(function(n){var g=se('g'),c=se('circle'),t=se('text'),hub=['root','life','studio','brain'].includes(n[0]);g.setAttribute('class','atlas-node '+n[4]+(n[0]===chosen?' active':'')+(filter!=='all'&&n[4]!==filter&&n[4]!=='root'?' dim':''));g.setAttribute('transform','translate('+n[2]+' '+n[3]+')');g.setAttribute('role','button');g.setAttribute('tabindex','0');g.setAttribute('aria-label',n[1]+': '+n[5]);c.setAttribute('r',n[0]==='root'?28:hub?20:9);t.textContent=n[1];t.setAttribute('y',n[0]==='root'?54:hub?42:28);t.setAttribute('text-anchor','middle');g.append(c,t);g.addEventListener('click',function(){select(n);draw()});g.addEventListener('keydown',function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();select(n);draw()}});dots.append(g)});
  svg.append(lines,dots);svg.setAttribute('viewBox',((1060-1060/zoom)/2)+' '+((620-620/zoom)/2)+' '+(1060/zoom)+' '+(620/zoom));
  }
+ // User-approved entries augment, never replace, the structural atlas.
+ async function refreshKnowledge(){
+  try{
+   var response=await fetch('/api/knowledge',{cache:'no-store'});if(!response.ok)return;
+   var data=await response.json();
+   N=N.filter(function(n){return !String(n[0]).startsWith('memory-')});
+   E=E.filter(function(e){return !String(e[0]).startsWith('memory-')&&!String(e[1]).startsWith('memory-')});
+   var items=Array.isArray(data.items)?data.items.slice(0,6):[];
+   var places=[[570,417],[613,505],[451,579],[395,544],[685,482],[610,360]];
+   var targets={general:'brain',studio:'studio',corpo:'body',relazioni:'relations',fede:'faith',denaro:'money',tempo:'time',progetti:'life'};
+   items.forEach(function(x,i){
+    var id='memory-'+x.id,p=places[i];
+    N.push([id,String(x.title).slice(0,27),p[0],p[1],'knowledge',
+       'Memoria approvata da te ('+x.kind+'). Fonte originale presente in D1 e nell’export Obsidian.',
+       'mente','D1 · SHA256 '+String(x.sha256||'').slice(0,12)]);
+    E.push([id,targets[x.domain]||'brain']);
+   });
+   if(!item(chosen))chosen='root';select(item(chosen));draw();
+  }catch(e){/* no simulated fallback */}
+ }
  select(N[0]);draw();
+ refreshKnowledge();
+ window.addEventListener('lifeos:knowledge-changed',refreshKnowledge);
  document.querySelectorAll('[data-atlas-filter]').forEach(function(b){b.addEventListener('click',function(){filter=b.dataset.atlasFilter;document.querySelectorAll('[data-atlas-filter]').forEach(function(x){x.classList.toggle('active',x===b)});draw()})});
  q('atlas-in').addEventListener('click',function(){zoom=Math.min(1.7,zoom+.15);draw()});q('atlas-out').addEventListener('click',function(){zoom=Math.max(.8,zoom-.15);draw()});
  function centerMap(){var s=document.querySelector('.atlas-scroll');if(s&&s.scrollWidth>s.clientWidth)s.scrollLeft=Math.round((s.scrollWidth-s.clientWidth)*.48)}
