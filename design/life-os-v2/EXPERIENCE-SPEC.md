@@ -1,6 +1,14 @@
 # LIFE OS V2 — Experience specification
 **Status:** Design proposal, not shipped. Parent: MASTER-DESIGN.md · 2026-10-12
 
+## REVISIONE DI PRODOTTO — INPUT ZERO, CONTESTO AUTOALIMENTATO
+
+L'applicazione NON deve richiedere di digitare focus, note, obiettivi, stati, classificazioni o importare quotidianamente ZIP per risultare utile. Le sezioni originariamente descritte con campi da compilare sono **azioni facoltative**, non onboarding obbligatorio. La home parte da eventi realmente osservati e fonte/ora, propone il focus soltanto quando c'è evidenza; in assenza di connettori mostra onestamente cosa non sa. Il grafo cresce dagli eventi e dalle fonti senza intervento quotidiano, ma i collegamenti interpretativi sono bozze da verificare. Cattura manuale come valvola d'emergenza, non modalità primaria.
+
+**Nuovo storyboard prioritario:** (1) GitHub/Cloudflare cambia senza apertura Life OS; (2) collector rileva delta, deduplica e registra receipt; (3) sistema aggiorna nodo progetto e timeline; (4) home mostra una sola attenzione azionabile, con fonte e timestamp; (5) l'utente legge e, se serve, decide; (6) nessuna compilazione, nessuna trascrizione.
+
+**Criterio UX di accettazione:** sette giorni di uso ordinario con **zero inserimenti manuali obbligatori**; brief con stato reale da almeno una sorgente verificata. Vedi [ZERO-INPUT-ARCHITECTURE.md](ZERO-INPUT-ARCHITECTURE.md) e [MASTER-DESIGN.md](MASTER-DESIGN.md).
+
 ## Product personality
 
 Notion organizza dati; Linear organizza progetti; Obsidian organizza idee. SOLIWKR deve aiutare **una persona** a orientare la propria esistenza senza trasformarla in lavoro. Vibe: "atelier personale" e non "admin SaaS".
