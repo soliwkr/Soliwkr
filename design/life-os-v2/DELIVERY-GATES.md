@@ -3,6 +3,12 @@
 **Owner:** Chris · **Repository:** soliwkr/Soliwkr
 **Related:** MASTER-DESIGN.md and EXPERIENCE-SPEC.md.
 
+## CAMBIO PRIORITÀ — NESSUN DATA ENTRY NECESSARIO
+
+Questa checklist resta P0 di sicurezza/restore/release. **Il primo valore dopo G0 non è il redesign della shell ma un flusso di ingestion completamente automatico, GitHub→Cloudflare→evidence ledger→Atlante→brief.** Deve funzionare anche se l'utente non scrive una sola nota, non classifica un task e non importa uno ZIP. Nessun crawl indiscriminato di Gmail/chat/contesti sensibili: OAuth/permessi granulari, niente falsa disponibilità dei dati. Mettere l'output del collector in modalità read-only prima di una qualsiasi scrittura semantica. Vedi [ZERO-INPUT-ARCHITECTURE.md](ZERO-INPUT-ARCHITECTURE.md).
+
+**Gate G1-auto:** >=30 eventi fixture con 0 duplicati e 100% URL/timestamp; osservazione di un vero nuovo evento verificato entro il polling dichiarato; niente false revenue; nessuna richiesta di compilare il sistema; nessuna interpretazione sensibile automatica. Se non c'è evento, non creare attenzione finta. L'UI migrerà solo se migliora questa esperienza osservativa.
+
 ## Branch reality — not negotiable
 
 The GitHub default branch MAIN does not yet include the Life Room application currently running under the protected custom domain. The PR stack is:
