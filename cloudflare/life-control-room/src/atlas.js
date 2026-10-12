@@ -4,7 +4,7 @@ const markup=[
 '<header class="view-head"><div class="eyebrow">KNOWLEDGE ATLAS</div><h1>Il tuo mondo.<br><span style="color:var(--accent)">Non una lista infinita.</span></h1><p>Esplora vita, progetti e conoscenza. I collegamenti sono strutturali: non inventano rapporti tra le persone.</p></header>',
 '<div class="atlas-top"><span class="eyebrow">SOLIWKR · GRAFO VIVO</span><button class="button lime" id="vault-export">↧ Vault Obsidian</button></div>',
 '<div class="atlas-board"><div class="atlas-filters"><button class="filter active" data-atlas-filter="all">Tutti</button><button class="filter" data-atlas-filter="life">Vita</button><button class="filter" data-atlas-filter="studio">Studio</button><button class="filter" data-atlas-filter="knowledge">Conoscenza</button><span style="flex:1"></span><button class="button small soft" id="atlas-out" aria-label="Riduci">−</button><button class="button small soft" id="atlas-in" aria-label="Ingrandisci">+</button></div>',
-'<div class="atlas-scroll"><svg id="atlas-svg" viewBox="0 0 1060 620" role="img" aria-label="Grafo di vita, studio e conoscenza"></svg></div>',
+'<div class="atlas-scroll"><svg id="atlas-svg" viewBox="0 0 1060 620" role="group" aria-label="Nodi interattivi del grafo di vita, studio e conoscenza"></svg></div>',
 '<div class="atlas-bottom">● Vita &nbsp; <span style="color:#9dd6e8">● Studio</span> &nbsp; <span style="color:#bfa9ff">● Conoscenza</span><span>Su mobile scorri lateralmente.</span></div></div>',
 '<div class="atlas-selected"><div><div class="eyebrow">NODO SELEZIONATO</div><h2 id="atlas-title">SOLIWKR</h2><p class="sub" id="atlas-description">Un ingresso. Tante stanze.</p><span class="caption" id="atlas-source">Fonte: governance</span></div><button class="button lime" id="atlas-open">Apri ↗</button></div>',
 '<div class="sectionrow"><h3>Il metodo Karpathy in Obsidian</h3><span class="chip">Markdown · Portabile</span></div>',
@@ -53,7 +53,9 @@ function installGraph(){
  select(N[0]);draw();
  document.querySelectorAll('[data-atlas-filter]').forEach(function(b){b.addEventListener('click',function(){filter=b.dataset.atlasFilter;document.querySelectorAll('[data-atlas-filter]').forEach(function(x){x.classList.toggle('active',x===b)});draw()})});
  q('atlas-in').addEventListener('click',function(){zoom=Math.min(1.7,zoom+.15);draw()});q('atlas-out').addEventListener('click',function(){zoom=Math.max(.8,zoom-.15);draw()});
- window.addEventListener('hashchange',function(){if(location.hash==='#grafo'){select(item(chosen));draw()}});
+ function centerMap(){var s=document.querySelector('.atlas-scroll');if(s&&s.scrollWidth>s.clientWidth)s.scrollLeft=Math.round((s.scrollWidth-s.clientWidth)*.48)}
+ window.addEventListener('hashchange',function(){if(location.hash==='#grafo'){select(item(chosen));draw();setTimeout(centerMap,120)}});
+ if(location.hash==='#grafo')setTimeout(centerMap,900);
  q('vault-export').addEventListener('click',async function(){if(!ready){toast('D1 non disponibile, non posso esportare.');return}if(dirty){await save();if(dirty){toast('Prima completa il salvataggio.');return}}var b=q('vault-export'),before=b.textContent;b.disabled=true;b.textContent='Preparo il vault...';try{var res=await fetch('/api/vault',{cache:'no-store'});if(!res.ok)throw Error('Errore di export HTTP '+res.status);var blob=await res.blob();if(blob.size<400)throw Error('Archivio incompleto');var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='Soliwkr-Wiki-'+new Date().toISOString().slice(0,10)+'.zip';document.body.append(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},15000);toast('ZIP privato pronto per Obsidian.')}catch(e){toast(e.message)}finally{b.disabled=false;b.textContent=before}});
 }
 export function injectAtlas(html){
