@@ -15,6 +15,7 @@ function database(){
   prepare(sql){let params=[];return{
    bind(...v){params=v;return this},
    async first(){return state},
+   async all(){return {results:[]}},
    async run(){
     if(sql.includes('INSERT OR IGNORE')){if(state)return {meta:{changes:0}};state={payload:params[0],version:1,updated_at:'2026-10-12 17:00:00'};return {meta:{changes:1}}}
     if(sql.includes('UPDATE private_state')){if(!state||state.version!==params[1])return {meta:{changes:0}};state={payload:params[0],version:state.version+1,updated_at:'2026-10-12 17:01:00'};return {meta:{changes:1}}}
