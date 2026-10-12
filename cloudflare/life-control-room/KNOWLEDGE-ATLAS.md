@@ -44,3 +44,26 @@ Acceptance: Oggi → Atlante → select node → Vault Obsidian → unzip → op
 Next: human-reviewed ingest of one source with Codex into a private local Obsidian vault; deterministic link/staleness lint; only later a consent-based bidirectional sync and Self Model.
 
 Rollback: Worker previous version; D1 untouched.
+
+## V1.3 — Wiki engine locale incluso nell'export (2026-10-12)
+
+Ogni ZIP scaricato contiene tools/wiki.mjs, un CLI Node.js 22 che non usa pacchetti esterni, non chiama API e non avvia agenti da solo.
+
+Sul laptop, dopo avere aperto Soliwkr-Wiki in Obsidian:
+
+    cd Soliwkr-Wiki
+    node tools/wiki.mjs status --vault .
+    node tools/wiki.mjs ingest /path/to/source.md --vault .
+    node tools/wiki.mjs ingest /path/to/source.md --vault . --apply
+    node tools/wiki.mjs query "priorità" --vault .
+    node tools/wiki.mjs lint --vault .
+
+INGEST: dry-run per default. Con --apply copia la fonte in raw/imports con hash, non sovrascrive gli originali, crea una pagina wiki/Ingest in DRAFT, aggiorna INDEX e appende LOG. Nessun fatto inferito.
+QUERY: ricerca testuale locale con righe/fonte, non sintesi AI.
+LINT: report read-only di collegamenti irrisolti e ambigui, frontmatter e provenienza. Exit status 2 se ci sono link mancanti.
+STATUS: conteggio locale di fonti e pagine; zero telemetria e nessuna sincronizzazione.
+
+Confine del prodotto: il layer deterministico fa ingest e controlli di qualità, ma non interpreta la vita di nessuno. Un agente locale autorizzato potrà poi proporre modifiche alla wiki sulla base delle fonti. I raw restano intatti e l'utente approva decisioni.
+
+Gate tecnico: tests ZIP/CLI in GitHub Actions, deploy Worker senza migrazioni, verifica autenticata dello ZIP e successiva apertura in Obsidian.
+Limiti: niente esecuzione CLI nativa su Android, niente bidirectional sync, niente vera sintesi LLM senza runtime e autorizzazione.
