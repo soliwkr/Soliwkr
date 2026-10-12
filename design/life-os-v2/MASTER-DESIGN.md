@@ -5,6 +5,14 @@
 **Repo di implementazione esistente:** soliwkr/Soliwkr, Cloudflare Life Control Room.
 **Provenienza:** AGENTS.md; governance/source-of-truth.md; governance/development-canon.md; PR #7 → #8 → #10 → #11 → #12; Andrej Karpathy, LLM Wiki (gist 442a6bf555914893e9891c11519de94f); documentazione Obsidian e Cloudflare citata più sotto.
 
+## REVISIONE VINCOLANTE — ZERO INPUT (2026-10-12)
+
+**Il proprietario non deve alimentare il Life OS manualmente.** La progettazione originaria parlava troppo di «scegli», «scrivi», «consolida», «compila» e «importa ZIP»: sono fallback facoltativi, NON il percorso primario. Il prodotto deve osservare **fonti già utilizzate**, con autorizzazioni e scope minimi, e compilare automaticamente fatti, eventi, stato e **bozze** di collegamenti. Il lavoro umano ordinario è vivere e operare altrove; nel Life OS serve solo decidere occasionalmente su una proposta importante o approvare un accesso.
+
+**Fonte normativa per questa correzione progettuale:** [ZERO-INPUT-ARCHITECTURE.md](ZERO-INPUT-ARCHITECTURE.md). In caso di conflitto con qualunque flusso di data entry nel presente documento, prevale la specifica zero-input. Nessun token ChatGPT/Gmail/Calendar già connesso nel prodotto ChatGPT è automaticamente riutilizzabile nel Worker Cloudflare. Non dichiarare ingest delle chat ChatGPT senza un'integrazione ufficiale implementata.
+
+**Roadmap corretta:** G0 Hardening → G1 ingestion GitHub+Cloudflare senza input manuale → G2 business receipts → G3 calendar read-only opt-in → G4 wiki agent con source-backed diff → G5 Jarvis. Il precedente piano con nuova UI prima dell'ingest è declassato a opzione successiva, non milestone principale.
+
 ## 0. Una tesi, non una raccolta di widget
 
 **Un unico ingresso. Stanze distinte. Intelligenza invisibile. Libertà di uscire.**
