@@ -70,6 +70,26 @@ async function publicKeys(issuer,now,fetcher){
   cachedKeys=keys;cachedIssuer=issuer;cacheUntil=now+JWKS_TTL_MS;
   return keys;
 }
+// Isolated staging failsafe: a short-lived pinned snapshot of PUBLIC JWKS, never
+// arbitrary user-supplied keys and never a substitute for RS256 verification.
+// No production Worker can enable this because the hostname must match exactly.
+function stagePinnedKeys(env,issuer,now){
+  if(env?.AIOS_HOST!=="aios-stage.soliwkr.pro" ||
+     env?.STAGE_JWKS_FALLBACK!=="enabled" ||
+     typeof env?.STAGE_ACCESS_JWKS!=="string")return null;
+  try{
+    const manifest=JSON.parse(env.STAGE_ACCESS_JWKS);
+    const captured=Date.parse(manifest.captured_at);
+    if(manifest.issuer!==issuer || !Number.isFinite(captured) ||
+       now<captured-60000 || now-captured>24*60*60*1000)return null;
+    if(!Array.isArray(manifest.keys) || manifest.keys.length<1 || manifest.keys.length>25)return null;
+    const keys=manifest.keys.filter(k=>k&&k.kty==="RSA"&&typeof k.kid==="string" &&
+      typeof k.n==="string"&&typeof k.e==="string" &&
+      (k.use===undefined||k.use==="sig")&&(k.alg===undefined||k.alg===ALG));
+    return keys.length===manifest.keys.length?keys:null;
+  }catch{return null}
+}
+
 /** Error codes are coarse, safe for authenticated staging diagnosis. */
 export async function evaluateAccessRequest(request,env,fetcher=fetch,now=Date.now()){
   const issuer=teamIssuer(env);
@@ -88,12 +108,19 @@ export async function evaluateAccessRequest(request,env,fetcher=fetch,now=Date.n
   if(status!=="ok")return {ok:false,code:status};
   let keys;
   try{keys=await publicKeys(issuer,now,fetcher);}
-  catch(e){return {ok:false,code:e.code||"certificates"}}
+  catch(e){
+    keys=stagePinnedKeys(env,issuer,now);
+    if(!keys)return {ok:false,code:e.code||"certificates"};
+  }
   let key=keys.find(k=>k.kid===header.kid);
   if(!key){
     cacheUntil=0;
-    try{keys=await publicKeys(issuer,now,fetcher);key=keys.find(k=>k.kid===header.kid);}
-    catch(e){return{ok:false,code:e.code||"certificates"}}
+    try{keys=await publicKeys(issuer,now,fetcher);}
+    catch(e){
+      keys=stagePinnedKeys(env,issuer,now);
+      if(!keys)return {ok:false,code:e.code||"certificates"};
+    }
+    key=keys.find(k=>k.kid===header.kid);
   }
   if(!key)return{ok:false,code:"signing-key"};
   try{
