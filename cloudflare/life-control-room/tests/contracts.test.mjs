@@ -5,9 +5,11 @@ import worker from '../src/index.js';
 import { HTML } from '../src/experience.js';
 import { injectAtlas } from '../src/atlas.js';
 import { createVaultArchive } from '../src/vault.js';
+import { ENV_AUTH, signedSession, installJwksFixture } from './auth-fixture.mjs';
+installJwksFixture();
 
 const base='https://aios.soliwkr.pro';
-const session={'cf-access-jwt-assertion':'contract-test-placeholder'};
+const session=signedSession();
 
 function database(){
  let state=null,logs=0;
@@ -39,14 +41,14 @@ test('Atlas adds a seventh view without removing the six V1 views',()=>{
 });
 
 test('Auth is required for private vault, wrong hostname is rejected',async()=>{
- const env={LIFE_DB:database()};
+ const env={LIFE_DB:database(),...ENV_AUTH};
  assert.equal((await worker.fetch(new Request(base+'/api/vault'),env)).status,401);
  assert.equal((await worker.fetch(new Request('https://wrong.example/api/vault',{headers:session}),env)).status,404);
  assert.equal((await worker.fetch(req('/api/health'),env)).status,200);
 });
 
 test('State V0 contract, roundtrip, optimistic write conflict and origin',async()=>{
- const env={LIFE_DB:database()};
+ const env={LIFE_DB:database(),...ENV_AUTH};
  let a=await worker.fetch(req('/api/state'),env),first=await a.json();
  assert.equal(first.version,0);
  const payload={version:0,state:{focus:'Focus',goals:[{id:'1',text:'Una mossa',done:false}],inbox:[{id:'2',text:'Private idea'}],notDoing:'Fermare distrazioni',pillars:{corpo:{signal:'watch',next:'Camminare'}}}};
@@ -63,7 +65,7 @@ test('State V0 contract, roundtrip, optimistic write conflict and origin',async(
 });
 
 test('Authenticated ZIP is private, valid, unicode and portable',async()=>{
- const env={LIFE_DB:database()};
+ const env={LIFE_DB:database(),...ENV_AUTH};
  let zip=await worker.fetch(req('/api/vault'),env);
  assert.equal(zip.status,200);
  assert.equal(zip.headers.get('content-type'),'application/zip');
