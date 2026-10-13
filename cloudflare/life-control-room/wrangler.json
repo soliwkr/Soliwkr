@@ -16,5 +16,13 @@
       "pattern": "aios.soliwkr.pro",
       "custom_domain": true
     }
-  ]
+  ],
+  "vars": {
+    "ACCESS_APP_AUD": "0a87f834676c8fee00a8c4dd2914f12ecebdde528da490ee522682ea0c71b099"
+  },
+  "triggers": {
+    "crons": [
+      "0 * * * *"
+    ]
+  }
 }
