@@ -20,7 +20,8 @@
   "vars": {
     "ACCESS_APP_AUD": "0a87f834676c8fee00a8c4dd2914f12ecebdde528da490ee522682ea0c71b099",
     "AIOS_HOST": "aios.soliwkr.pro",
-    "ACCESS_TEAM_DOMAIN": "https://soliwkr.cloudflareaccess.com"
+    "ACCESS_TEAM_DOMAIN": "https://soliwkr.cloudflareaccess.com",
+    "AIOS_PLATFORM_AUTH": "enabled"
   },
   "triggers": {
     "crons": [
