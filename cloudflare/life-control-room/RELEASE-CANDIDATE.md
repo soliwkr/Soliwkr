@@ -75,3 +75,19 @@ GitHub Actions workflow `Life Room contracts` enforces Node 22 tests on PR chang
 - **PENDING RELEASE GATE:** actual production snapshot/export backup and rollback plan; production D1 `0003_source_events.sql`; production Worker deployment to pinned RC commit; authenticated production smoke and one real event observed. No production private data moved into staging.
 - Never publish an Access JWT, application session, email secret, raw notes or backup SQL in this public repository.
 
+
+### Staging login 401 — investigation 2026-10-13
+
+An owner screenshot showed `Access authentication required` after login on stage. That text is the Worker-side 401 response, so Cloudflare Access login alone is insufficient proof of accepting the JWT.
+
+Read-only Cloudflare API findings:
+- The Access organization has a login display team name `teamchris.cloudflareaccess.com`, **but the configured authentication/JWKS domain is `soliwkr.cloudflareaccess.com`**.
+- Public JWKS was accessible on `https://soliwkr.cloudflareaccess.com/cdn-cgi/access/certs`; the `teamchris` JWKS URL did not yield keys in Browser Rendering. Do not rely on the UI display name as JWT issuer.
+- Staging audience, D1 fixture-only binding and `ACCESS_OWNER_EMAIL` secret were present and correct.
+
+Remediation in RC branch:
+- Made `ACCESS_TEAM_DOMAIN` an explicit, allowlisted HTTPS cloudflareaccess.com environment binding (non-user supplied); public keys, issuer and JWT signature validated against that configured team domain, never against request host.
+- Added coarse failure reason codes to `evaluateAccessRequest`. These appear **only** when `AIOS_HOST='aios-stage.soliwkr.pro'` AND `AIOS_AUTH_DIAGNOSTICS='enabled'`. No JWT, claims, email or cookies are logged or echoed, and production never reveals diagnostic reasons.
+- Redeployed **staging Worker only** after CI PASS, preserved owner secret and isolated D1 binding, verified public unauthenticated request still shows Cloudflare Access login rather than content.
+- **RETEST NEEDED:** owner should refresh stage. If still denied, report only the bracketed `stage-check: <code>` to identify the failing check, no token/cookies. Do not infer that authentication is fixed until the genuine signed session returns HTTP 200.
+
