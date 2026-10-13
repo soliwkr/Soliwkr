@@ -91,3 +91,14 @@ Remediation in RC branch:
 - Redeployed **staging Worker only** after CI PASS, preserved owner secret and isolated D1 binding, verified public unauthenticated request still shows Cloudflare Access login rather than content.
 - **RETEST NEEDED:** owner should refresh stage. If still denied, report only the bracketed `stage-check: <code>` to identify the failing check, no token/cookies. Do not infer that authentication is fixed until the genuine signed session returns HTTP 200.
 
+
+### Staging certificate fetch incident: temporary public-key fallback (2026-10-13)
+
+- Owner JWT reached the Worker and passed issuer/audience/owner/time checks but failed at `stage-check: certificates`.
+- The publicly available `https://soliwkr.cloudflareaccess.com/cdn-cgi/access/certs` was independently inspected over TLS and returned **two valid RS256 RSA public keys**; the browser Access login label `teamchris` is **not** the configured auth issuer.
+- Staging Worker now classifies certificate-failure causes (`cert-fetch`, `cert-http`, `cert-json`, `cert-keys`, etc.) with stage-only coarse codes. No token, cookie, key data or private claims are exposed.
+- **Temporary stage-only resilience:** `STAGE_JWKS_FALLBACK=enabled` and Cloudflare `STAGE_ACCESS_JWKS` secret binding hold a snapshot of the *public keys only*, captured from the official HTTPS cert endpoint. The fallback accepts keys solely when issuer matches and capture age is under **24h**. Each JWT still must pass strict RS256 cryptographic signature, owner email, issuer, exact app AUD, `iat` and `exp`. No fallback enabled in production.
+- Stage code deployed at commit `ce6d8ca598abe68703a0c34c978c6c90a11e0fe3`; GitHub Actions [PASS](https://github.com/soliwkr/Soliwkr/actions/runs/38425798654) including negative tests for forged tokens, wrong owner and expired pin.
+- Verified via Cloudflare API: isolated EU fixture D1 remains bound, owner secret and pin bindings present, `workers.dev` and preview URLs disabled, anonymous request shows Cloudflare Access login, not the cockpit.
+- **PENDING:** user refresh with real owner session to confirm HTTP 200. This is not a production fix; determine why staging Worker cannot fetch JWKS in real runtime, and create a tested **rotation-safe** certificate retrieval strategy before deploying verified Access security on the production domain. The static fallback is intentionally short-lived and stage-only.
+
