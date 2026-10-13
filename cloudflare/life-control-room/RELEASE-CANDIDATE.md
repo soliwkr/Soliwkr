@@ -61,3 +61,17 @@ GitHub Actions workflow `Life Room contracts` enforces Node 22 tests on PR chang
 - Main branch is not yet the deployed code until this RC is reviewed, merged and released.
 
 **Next human decision:** select the primary owner identity inside the existing Cloudflare Access policy (one-time), then carry out G0 backup/staging and controlled release. No rearchitecture or new cockpit.
+
+## G0 staging implementation log — 2026-10-13
+
+- Owner selected explicitly in conversation. The email is set in Cloudflare **secret bindings** on both current production script and isolated staging script; no email is hard-coded in the repository. Production's current Worker code does not yet consume that secret, so the *new* owner gate remains to be deployed.
+- Verified the selected owner is included in the existing Access application's allowed principals; its nonsecret application AUD matches the RC configuration. Existing policy retains two principals, but new Worker verifies one owner.
+- Created **EU-jurisdiction fixture-only D1** `soliwkr-life-room-rc1-staging`, verified the base and additive source/knowledge migrations, inserted only synthetic state and a synthetic technical event.
+- Tested D1 point-in-time recovery in staging: take bookmark → intentionally edit fixture/delete event → restore to bookmark → verify original version/payload and event are present again. **PASS.** Production D1 PITR bookmark availability also confirmed, but no external full backup has yet been created.
+- Created separate Cloudflare Access staging application with **owner-only policy** and different app audience.
+- Created Worker `soliwkr-life-room-stage` using this RC source and isolated fixture D1. Configured stage host/app AUD and owner secret; disabled `workers.dev` and preview URLs.
+- Mapped `aios-stage.soliwkr.pro` to that Worker. Unauthenticated Browser Rendering snapshot **PASS**: Access sign-in displayed; no Life OS content or private data visible.
+- **PENDING HUMAN GATE:** authenticated owner login through Access staging app and real 200 response from Mission Control. There is a distinct Access team hostname presented in the login UI; do not assume JWT issuer matches configured one until this test passes. On 401, inspect signed assertion claims securely and adjust fixed issuer and JWKS after confirming the actual application owner. Do not weaken signature or owner checks.
+- **PENDING RELEASE GATE:** actual production snapshot/export backup and rollback plan; production D1 `0003_source_events.sql`; production Worker deployment to pinned RC commit; authenticated production smoke and one real event observed. No production private data moved into staging.
+- Never publish an Access JWT, application session, email secret, raw notes or backup SQL in this public repository.
+
