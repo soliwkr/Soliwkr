@@ -46,7 +46,7 @@ if(env.AIOS_HOST==='aios-stage.soliwkr.pro'&&
   // token, IP, session, or personal data are collected.
   const status=platform.ok?'ok':platform.available?'error':'unknown';
   ctx.waitUntil(env.LIFE_DB.prepare(
-    "INSERT INTO source_checks(provider,source_key,checked_at,status,error_code,events_seen) VALUES('access_runtime','ctx_access',?,?,?,?,0) "+
+    "INSERT INTO source_checks(provider,source_key,checked_at,status,error_code,events_seen) VALUES('access_runtime','ctx_access',?,?,?,0) "+
     "ON CONFLICT(provider,source_key) DO UPDATE SET checked_at=excluded.checked_at,status=excluded.status,error_code=excluded.error_code,events_seen=0"
   ).bind(new Date().toISOString(),status,platform.code).run().catch(()=>{}));
 }
