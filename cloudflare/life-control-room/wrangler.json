@@ -37,7 +37,8 @@
         "AIOS_HOST": "aios-stage.soliwkr.pro",
         "ACCESS_TEAM_DOMAIN": "https://soliwkr.cloudflareaccess.com",
         "AIOS_AUTH_DIAGNOSTICS": "enabled",
-        "STAGE_JWKS_FALLBACK": "enabled"
+        "STAGE_JWKS_FALLBACK": "enabled",
+        "AIOS_PLATFORM_AUTH": "observe"
       },
       "d1_databases": [
         {
