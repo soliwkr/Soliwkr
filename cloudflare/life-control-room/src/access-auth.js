@@ -1,12 +1,22 @@
 // Fail-closed Cloudflare Access application JWT verification.
 // No external dependencies, no user-controlled JWKS URL, no identity in logs.
-const CERTS_BASE = "https://soliwkr.cloudflareaccess.com";
-const EXPECTED_ISSUER = CERTS_BASE;
-const JWKS_ENDPOINT = CERTS_BASE + "/cdn-cgi/access/certs";
+// The Access team's real issuer is an environment-specific AUTHORIZATION fact.
+// Never infer it from the request Host, the JWT itself, or the application domain.
+function teamIssuer(env) {
+  const candidate = env?.ACCESS_TEAM_DOMAIN;
+  if (typeof candidate !== "string") return null;
+  try {
+    const u = new URL(candidate);
+    if (u.protocol !== "https:" || !/^[a-z0-9-]+\.cloudflareaccess\.com$/.test(u.hostname) ||
+        u.port || u.username || u.password || u.pathname !== "/" || u.search || u.hash) return null;
+    return u.origin;
+  } catch { return null; }
+}
 const ALG = "RS256";
 const JWKS_TTL_MS = 5 * 60 * 1000;
 const MAX_TOKEN_CHARS = 16000;
 let cachedKeys = null;
+let cachedIssuer = null;
 let cacheUntil = 0;
 
 function base64urlToBytes(source) {
@@ -21,13 +31,13 @@ function jsonPart(part) {
   return result;
 }
 
-function checkClaims(claims, env, now) {
+function checkClaims(claims, env, now, issuer) {
   const expectedAudience = env.ACCESS_APP_AUD;
   const expectedOwner = env.ACCESS_OWNER_EMAIL;
   if (!/^[0-9a-f]{64}$/i.test(expectedAudience || "")) return false;
   if (typeof expectedOwner !== "string" || !expectedOwner.includes("@")) return false;
 
-  if (claims.iss !== EXPECTED_ISSUER && claims.iss !== EXPECTED_ISSUER + "/") return false;
+  if (claims.iss !== issuer && claims.iss !== issuer + "/") return false;
   if (!(claims.aud === expectedAudience || (Array.isArray(claims.aud) && claims.aud.includes(expectedAudience)))) return false;
   if (typeof claims.sub !== "string" || !claims.sub.trim()) return false;
 
@@ -43,9 +53,9 @@ function checkClaims(claims, env, now) {
   return true;
 }
 
-async function publicKeys(now, fetcher) {
-  if (cachedKeys && now < cacheUntil) return cachedKeys;
-  const response = await fetcher(JWKS_ENDPOINT, {
+async function publicKeys(issuer, now, fetcher) {
+  if (cachedKeys && cachedIssuer === issuer && now < cacheUntil) return cachedKeys;
+  const response = await fetcher(issuer + "/cdn-cgi/access/certs", {
     headers: { Accept: "application/json" },
     redirect: "error"
   });
@@ -62,6 +72,7 @@ async function publicKeys(now, fetcher) {
   );
   if (!keys.length) throw new Error("No acceptable JWKS keys");
   cachedKeys = keys;
+  cachedIssuer = issuer;
   cacheUntil = now + JWKS_TTL_MS;
   return keys;
 }
@@ -69,7 +80,8 @@ async function publicKeys(now, fetcher) {
 /** Always returns false on configuration, parsing, signature, or claims failure. */
 export async function verifyAccessRequest(request, env, fetcher = fetch, now = Date.now()) {
   try {
-    if (!env || typeof env.ACCESS_APP_AUD !== "string" || typeof env.ACCESS_OWNER_EMAIL !== "string") return false;
+    const issuer = teamIssuer(env);
+    if (!issuer || typeof env.ACCESS_APP_AUD !== "string" || typeof env.ACCESS_OWNER_EMAIL !== "string") return false;
     const token = request.headers.get("cf-access-jwt-assertion");
     if (!token || token.length > MAX_TOKEN_CHARS) return false;
     const pieces = token.split(".");
@@ -78,14 +90,14 @@ export async function verifyAccessRequest(request, env, fetcher = fetch, now = D
     const header = jsonPart(pieces[0]);
     const claims = jsonPart(pieces[1]);
     if (header.alg !== ALG || typeof header.kid !== "string" || !header.kid ||
-        !checkClaims(claims, env, now)) return false;
+        !checkClaims(claims, env, now, issuer)) return false;
 
-    let keys = await publicKeys(now, fetcher);
+    let keys = await publicKeys(issuer, now, fetcher);
     let key = keys.find(k => k.kid === header.kid);
     if (!key) {
       // Signing key rotation: discard cache once, then fetch a current JWKS.
       cacheUntil = 0;
-      keys = await publicKeys(now, fetcher);
+      keys = await publicKeys(issuer, now, fetcher);
       key = keys.find(k => k.kid === header.kid);
     }
     if (!key) return false;
