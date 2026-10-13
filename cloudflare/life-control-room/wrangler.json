@@ -38,7 +38,7 @@
         "ACCESS_TEAM_DOMAIN": "https://soliwkr.cloudflareaccess.com",
         "AIOS_AUTH_DIAGNOSTICS": "enabled",
         "STAGE_JWKS_FALLBACK": "enabled",
-        "AIOS_PLATFORM_AUTH": "observe"
+        "AIOS_PLATFORM_AUTH": "enabled"
       },
       "d1_databases": [
         {
