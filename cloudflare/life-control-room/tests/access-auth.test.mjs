@@ -50,8 +50,8 @@ test("owner, issuer, audience and token clock boundaries are mandatory", async (
   assert.equal(await verifyAccessRequest(request(createToken()), { ...ENV_AUTH, ACCESS_TEAM_DOMAIN: "" }, mockJwksFetch), false);
   assert.equal(await verifyAccessRequest(request(createToken()), { ...ENV_AUTH, ACCESS_TEAM_DOMAIN: "https://evil.example" }, mockJwksFetch), false);
   assert.equal(await verifyAccessRequest(request(createToken()), { ...ENV_AUTH, ACCESS_TEAM_DOMAIN: "https://teamchris.cloudflareaccess.com.evil.example" }, mockJwksFetch), false);
-  assert.equal(await verifyAccessRequest(request(createToken()), { ...ENV_AUTH, ACCESS_TEAM_DOMAIN: "https://teamchris.cloudflareaccess.com/path" }, mockJwksFetch), false);
-  assert.equal(await verifyAccessRequest(request(createToken({iss:"https://soliwkr.cloudflareaccess.com"})), ENV_AUTH, mockJwksFetch), false);
+  assert.equal(await verifyAccessRequest(request(createToken()), { ...ENV_AUTH, ACCESS_TEAM_DOMAIN: "https://soliwkr.cloudflareaccess.com/path" }, mockJwksFetch), false);
+  assert.equal(await verifyAccessRequest(request(createToken({iss:"https://teamchris.cloudflareaccess.com"})), ENV_AUTH, mockJwksFetch), false);
 });
 
 test("unavailable JWKS or unknown signing key fails closed", async () => {
