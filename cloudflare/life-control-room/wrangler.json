@@ -18,11 +18,36 @@
     }
   ],
   "vars": {
-    "ACCESS_APP_AUD": "0a87f834676c8fee00a8c4dd2914f12ecebdde528da490ee522682ea0c71b099"
+    "ACCESS_APP_AUD": "0a87f834676c8fee00a8c4dd2914f12ecebdde528da490ee522682ea0c71b099",
+    "AIOS_HOST": "aios.soliwkr.pro"
   },
   "triggers": {
     "crons": [
       "0 * * * *"
     ]
+  },
+  "env": {
+    "staging": {
+      "name": "soliwkr-life-room-stage",
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "ACCESS_APP_AUD": "97cd7900b99b88b7f3244b0048f9a01b787a1d1a0d4c6700662a539775ec6a28",
+        "AIOS_HOST": "aios-stage.soliwkr.pro"
+      },
+      "d1_databases": [
+        {
+          "binding": "LIFE_DB",
+          "database_name": "soliwkr-life-room-rc1-staging",
+          "database_id": "8a539b62-0070-476c-8ebe-f9dc354e09d9"
+        }
+      ],
+      "routes": [
+        {
+          "pattern": "aios-stage.soliwkr.pro",
+          "custom_domain": true
+        }
+      ]
+    }
   }
 }
