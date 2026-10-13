@@ -102,3 +102,17 @@ Remediation in RC branch:
 - Verified via Cloudflare API: isolated EU fixture D1 remains bound, owner secret and pin bindings present, `workers.dev` and preview URLs disabled, anonymous request shows Cloudflare Access login, not the cockpit.
 - **PENDING:** user refresh with real owner session to confirm HTTP 200. This is not a production fix; determine why staging Worker cannot fetch JWKS in real runtime, and create a tested **rotation-safe** certificate retrieval strategy before deploying verified Access security on the production domain. The static fallback is intentionally short-lived and stage-only.
 
+
+
+### Verified runtime-backed Access identity — 2026-10-13
+
+- The owner confirmed that authenticated staging **loaded and worked** with the previously configured short-lived public-JWKS fallback (user acceptance of the cockpit, not an attestation of all integrations).
+- Cloudflare officially offers `ctx.access` to Workers directly authenticated by Access, including an application `aud` and `getIdentity().email`. See https://developers.cloudflare.com/workers/configuration/cloudflare-access/ . It does not propagate across service binding invocations.
+- `access-platform.js` now validates a **runtime-provided** Cloudflare Access context, exact application AUD and the explicitly configured owner email. This is a separate trust path; it does not accept request-supplied identity headers.
+- The revised Worker is **dual-path**: if `AIOS_PLATFORM_AUTH=enabled` and a runtime Access context exists, use it and deny mismatched owner/AUD; otherwise use cryptographically verified JWT with public keys. This does not permit unauthenticated service-binding requests through.
+- Tested on stage first in `observe` mode, with JWT still authoritative. A stage-only fixture database status entry recorded `access_runtime/ctx_access: status=ok,error_code=platform` at 2026-10-13 16:14 UTC (no email, JWT or PII stored). This confirms a real Access-protected request reached the Worker with valid native owner and audience.
+- Switched **staging only** to `AIOS_PLATFORM_AUTH=enabled` at 2026-10-13 16:15 UTC. The separate EU fixture-only D1 binding, owner secret and policy remained intact; staging is awaiting repeat authenticated end-to-end smoke after the switch.
+- Production's **repository configuration**, not its running Worker, now includes `AIOS_PLATFORM_AUTH=enabled` for the future approved deployment. Production intentionally has **no** `STAGE_JWKS_FALLBACK` or `STAGE_ACCESS_JWKS` binding; the public-key snapshot is not an authorized production authentication mechanism.
+- Tests cover the native Access context being unavailable (JWT required), correct owner+aud, wrong owner+aud and missing/failed identity lookup. Signed JWT still fails closed on forged/expired credentials. `AIOS_PLATFORM_AUTH` is an operator-only Worker configuration variable, never accepted from a request.
+- **Release blockers remain**: an independently documented production data backup/export and recovery rehearsal or agreed PITR rollback, controlled D1 0003 migration, review/merge approval, actual production 200/401 authorization smoke, one real GitHub event and release SHA traceability. No production rollout has occurred.
+
