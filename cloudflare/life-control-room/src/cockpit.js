@@ -2,7 +2,7 @@
 // no fabricated connected services, manual planning remains optional.
 const COCKPIT = [
   '<div class="mc-shell" id="mission-control">',
-  '<div class="mc-head"><div><div class="eyebrow">MISSION CONTROL · SOLIWKR</div><h2>Il quadro completo. <span>Una sola vista.</span></h2><p>Fatti dalle fonti disponibili, memoria personale e capacità operative. Nessun dato richiesto per iniziare.</p></div><button class="mc-refresh" id="mc-refresh" type="button" aria-label="Aggiorna stato delle fonti">↻ Aggiorna</button></div>',
+  '<div class="mc-head"><div><div class="eyebrow">MISSION CONTROL · SOLIWKR · <span id="date">—</span></div><h2><span id="greeting">Bentornato.</span> <span>Il quadro completo.</span></h2><p>Fatti dalle fonti disponibili, memoria personale e capacità operative. Nessun dato richiesto per iniziare.</p></div><button class="mc-refresh" id="mc-refresh" type="button" aria-label="Aggiorna stato delle fonti">↻ Aggiorna</button></div>',
   '<div class="mc-ribbon" aria-live="polite"><span class="mc-lamp" id="mc-lamp"></span><b id="mc-readiness">Verifico le fonti…</b><span class="mc-stamp" id="mc-stamp">Nessuna verifica completata</span><span class="mc-legend">Sconosciuto ≠ zero · Attività ≠ risultato</span></div>',
   '<div class="mc-layout">',
   '<article class="mc-card mc-source"><div class="mc-card-title"><div><small>01 / INFRASTRUTTURA</small><h3>Il sistema</h3></div><span class="mc-mark">◈</span></div>',
