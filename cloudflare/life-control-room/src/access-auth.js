@@ -36,18 +36,37 @@ function claimStatus(claims,env,now,issuer){
      (claims.nbf!==undefined&&(!Number.isInteger(claims.nbf)||claims.nbf>time)))return "clock";
   return "ok";
 }
+function certsError(code){
+  // Fixed, non-sensitive classification. Never attach network error body,
+  // certificate material, JWT or credentials to the user-facing response.
+  const e=new Error("Access certificate lookup failed");
+  e.code=code;
+  return e;
+}
 async function publicKeys(issuer,now,fetcher){
   if(cachedKeys&&cachedIssuer===issuer&&now<cacheUntil)return cachedKeys;
-  const r=await fetcher(issuer+"/cdn-cgi/access/certs",{headers:{Accept:"application/json"},redirect:"error"});
-  if(!r.ok)throw Error("jwks status");
-  const body=await r.text();
-  if(body.length>120000)throw Error("jwks too large");
-  const json=JSON.parse(body);
-  if(!Array.isArray(json.keys)||json.keys.length>25)throw Error("jwks malformed");
+  let r;
+  try{
+    r=await fetcher(issuer+"/cdn-cgi/access/certs",{
+      headers:{Accept:"application/json"},
+      redirect:"error"
+    });
+  }catch{
+    throw certsError("cert-fetch");
+  }
+  if(!r||!r.ok)throw certsError("cert-http");
+  let body;
+  try{body=await r.text();}
+  catch{throw certsError("cert-body")}
+  if(body.length>120000)throw certsError("cert-size");
+  let json;
+  try{json=JSON.parse(body)}
+  catch{throw certsError("cert-json")}
+  if(!Array.isArray(json.keys)||json.keys.length>25)throw certsError("cert-schema");
   const keys=json.keys.filter(k=>k&&k.kty==="RSA"&&typeof k.kid==="string"&&
     typeof k.n==="string"&&typeof k.e==="string"&&
     (k.use===undefined||k.use==="sig")&&(k.alg===undefined||k.alg===ALG));
-  if(!keys.length)throw Error("jwks empty");
+  if(!keys.length)throw certsError("cert-keys");
   cachedKeys=keys;cachedIssuer=issuer;cacheUntil=now+JWKS_TTL_MS;
   return keys;
 }
@@ -69,12 +88,12 @@ export async function evaluateAccessRequest(request,env,fetcher=fetch,now=Date.n
   if(status!=="ok")return {ok:false,code:status};
   let keys;
   try{keys=await publicKeys(issuer,now,fetcher);}
-  catch{return {ok:false,code:"certificates"}}
+  catch(e){return {ok:false,code:e.code||"certificates"}}
   let key=keys.find(k=>k.kid===header.kid);
   if(!key){
     cacheUntil=0;
     try{keys=await publicKeys(issuer,now,fetcher);key=keys.find(k=>k.kid===header.kid);}
-    catch{return{ok:false,code:"certificates"}}
+    catch(e){return{ok:false,code:e.code||"certificates"}}
   }
   if(!key)return{ok:false,code:"signing-key"};
   try{
