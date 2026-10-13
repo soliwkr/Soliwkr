@@ -1,88 +1,71 @@
-# ADR-002 — JARVIS runtime choice: Cloudflare Think primary, Hermes delegated
-**Status:** Accepted product/architecture direction for planning (2026-10-13); **not deployed**.
-**Owner:** SOLIWKR Operator & Portfolio AIOS. Supersedes the unresolved Hermes-vs-Think-vs-GrokBot option set in the V2 design. No provider, OAuth, secret, billing or user data permissions are implied by this ADR.
+# ADR-002 — JARVIS: reuse existing Hermes Telegram, no second bot
+**Status:** Revised on 2026-10-13 — **CONDITIONAL ON RUNTIME AUDIT; NO DEPLOYMENT AUTHORIZED**.
+**Owner:** SOLIWKR Operator & Portfolio AIOS.
+**Supersedes:** ADR-002 draft that selected Cloudflare Think as the primary chat agent before discovering existing bot.
 
-## Decision
+## Evidence that changes the architecture
 
-**JARVIS resident agent = Cloudflare Think + Agents SDK + official Telegram messenger adapter.**
+The owner supplied a screenshot of a **Telegram bot titled Soliwkr**, already interacting with a Hermes-like agent. The bot claims that on Linux it is installed under `/home/soliwkr/.local/bin/hermes`, with sessions/config in `/home/soliwkr/.hermes`, and projects at `/home/soliwkr/Work`.
 
-- One resident agent persona, one Telegram DM, one Life OS authority graph.
-- Worker/DO per user or bot with persisted conversation state and typed tools; model provider behind explicit, cost-controlled adapter.
-- Durable event collection and evidence ledger in Cloudflare, **not** in Jarvis' conversation history.
-- Messenger ingress deployed separately from the Access-protected private cockpit, via HTTPS route + Telegram secret-token verification + pairing to the owner.
-- Business facts and cross-project decisions remain in their owners' data stores / GitHub; Life OS stores pointers, projections and authorized personal memory.
-- Scheduler/webhooks produce *verified observations* before Think summarizes them. Do not wake expensive models on unchanged data. Proactive delivery requires a persistent channel binding, recipient consent, quiet hours, dedup and sender authorization.
+**Important:** a chat reply is a claim, not a runtime attestation. It does NOT verify the systemd gateway, precise host or running instances, uptime, actual backup integrity, source permissions, whether Telegram token is duplicated across laptop/VPS, or that the bot has access to any SOLIWKR canon data. A backup status without restore test is not proof of recoverability.
 
-**Hermes Agent remains a replaceable specialist execution runtime**, for jobs needing a Linux filesystem, terminal, browser, complex code changes, or long sessions. It is not another Jarvis identity and cannot silently replicate the private Life OS store. Where Hermes is available on the existing laptop/VPS, delegate restricted jobs over an authenticated tool/queue, beginning in read-only/draft mode. No reason to deploy an extra Cloudflare Container or buy a new VPS solely for Jarvis V0.
+An existing chat transport and an existing agent are now likely. Creating a second Telegram Jarvis and moving memory to Think by default is architectural waste and operational risk.
 
-**Grok Bot is not the memory authority or primary messaging gateway.** Potential external executor only after evaluating provider data retention, export, tool scope and costs; no commitment.
+## Revised decision
 
-## Why this decision fits the user's actual constraints
+**Reuse the existing Soliwkr Telegram bot and Hermes gateway as the FIRST Jarvis candidate. Do not deploy the separate Think bot.**
 
-1. **Zero mandatory data entry.** GitHub/Cloudflare collectors populate event ledger without forms; message bot answers and occasionally surfaces actionable changes. Telegram chat is a *lens*, not the source.
-2. **Cloudflare-first, not Cloudflare-for-everything.** Durable Objects persist Think conversation state, D1 persists sources/knowledge, Workers run webhooks and verified tools. The agent can idle between events and does not require a 24h Python gateway.
-3. **Preserves existing Hermes investment.** User already has Hermes on laptop and VPS. Use it only where it adds a real tool, not to duplicate messaging state, app auth and event orchestration.
-4. **No homemade agent loop.** Official Think provides chat lifecycle, message persistence, tool calls, resumable streaming and Telegram messenger support. Start from vendor official example; pin ref at implementation time and verify maintenance/license.
-5. **Recoverable and inspectable.** App agent state != canonical decision log; every tool call requires source references, policy and receipts.
+- **Soliwkr / Hermes:** user-facing Telegram chat, agentic tools and scoped specialist work. One live gateway owner per Telegram bot token.
+- **Cloudflare / SOLIWKR Life OS:** central evidence ledger, source acquisition, source-aware graph, governance, personal data and durable decisions. Neither bot transcript nor Hermes local notes become normative source-of-truth simply by existing.
+- **Obsidian:** curated local wiki fed by approved source-backed exports/sync; no manual entries required in the target operating model.
+- **Hermes ↔ Life OS:** minimum-scope API/tools, initially read-only; service identity and policy enforced server-side, clear receipts, no unscoped terminal or writes to personal DB.
+- **Cloudflare Think:** a **fallback**, only if Hermes cannot meet 24/7 uptime, security, latency or verified cost gates. Keep existing PR #17 as experimental/draft; never create competing gateway/Telegram token consumers without explicit migration plan.
+- **Grok Bot:** not necessary for the first production loop.
 
-## Alternative matrix — explicit trade-offs
+### Why
 
-| Alternative | Strength | Main cost/risk now | Disposition |
-| --- | --- | --- | --- |
-| Think + Telegram | Native Workers/DO, event-driven, official messenger SDK | Some Life OS tools/adapters to implement; AI usage costs | **Selected** |
-| Hermes on existing VPS | High built-in capabilities, fastest hands-on assistant | Persistent host costs/ops, external source API/auth wiring, risk of two competing memories | **Delegated/benchmarked** |
-| Hermes in CF Containers | Python/Linux, Cloudflare account | Container wake/sleep, durable external storage, porting/supervision, compute billing | **Not first release** |
-| Grok Bot hosted | Quick rich automation in provider sandbox | Provider lock-in, policies and data ownership | **Only optional trial** |
+The user already has a working Telegram conversation (as visible in the screenshot). Hermes includes a messaging gateway, memory and cron, so duplicating them with Think provides little immediate value. Cloudflare still gives us the hard part we actually need: reliable source ingestion and policy-governed memory. The cheapest deployment is reusing infrastructure already active; the highest-confidence choice requires verifying if that host is always available.
 
-Cloudflare Containers may be cost-effective for bursty tool workloads and support sleeping; this does NOT establish that the Hermes gateway as a whole can run safely/economically there without state and ingress design.
+## Gate H0 — Verify actual Hermes residency (READ-ONLY)
 
-## Component contracts
+On the Linux machine claimed in screenshot, run as the bot's Linux user:
 
-```text
-Provider events (GitHub/CF + later opt-ins)
-  -> source collectors (verified signed hook / scoped API polling)
-  -> D1 event ledger + normalized source citations
-  -> deterministic relevance policy
-  -> proposal/brief queue (dedup + recency + quiet hours)
-  -> JARVIS Think Agent -> Telegram DM (source link/time, sparse)
-                           -> on-demand Life OS read-only tools
-                           -> optional Hermes specialist, isolated, only approved task
-Life OS D1/Obsidian remains the personal knowledge authority; no transcripts auto-mirrored.
+```sh
+command -v hermes
+hermes gateway status
+systemctl --user status hermes-gateway --no-pager
+systemctl --user is-enabled hermes-gateway
+hostnamectl --static
+uptime
 ```
 
-Tool modes: `READ_SOURCE` (default), `PROPOSE` (review), `EXECUTE` (policy + role + approval + receipt). No permission can be granted by a natural-language claim in a Telegram message or a fetched document.
+Also inspect any system-scope service and other Hermes gateways on the existing VPS, **without stopping them**. Never paste the contents of `~/.hermes/.env`, Telegram bot token, credentials or private logs in a public issue. Redact IDs and hostnames if needed. Confirm what machine responds when the laptop is off and whether Telegram message polling/webhooks conflict across hosts.
 
-In agent responses distinguish source data, hypothesis, unknown/stale and consent. A GitHub push proves a push, not revenue or human wellbeing.
+Check the backup separately: a claimed 8.1GB copy and permissions 700 are not a passed restore. Confirm source, date, checksum, encryption and restoration on disposable data. Do not read any private file into GitHub.
 
-## V0 scope, strict order
+**GATE:** one confirmed responding gateway process + known durable state directory + recovery documentation. If host is laptop-only, choose existing always-on host or supported serverless arrangement after uptime/cost check. Do not infer a VPS is running the same token.
 
-**G0 — P0 identity/recovery/release (#14):** verify Cloudflare Access JWT server-side for cockpit and private APIs; restore rehearsal, least privilege, traceable Worker release. Until G0 complete, bot cannot read private D1 or deliver private content.
+## Gate H1 — One real zero-input event
 
-**G1 — Data collector (#15):** one read-only verified GitHub or Cloudflare change, deduped D1 receipt with source/occurred_at/observed_at, no private manual entries. Run without Think model if event has no material change.
+Source collectors observe GitHub / Cloudflare technical change with source, timestamp and deduplicated event ID. Life OS decides whether it merits attention. Existing Hermes gateway receives a tiny signed or authenticated **event reference**, retrieves an authorized read-only projection and sends one Telegram DM with citation. No need for operator to message the bot or write a note. Replays create zero additional DMs. Silence on no changes.
 
-**G2 — Telegram agent (#16):** deploy official Think Telegram example on a separate route with webhook secret validation, TTL one-time pairing via verified cockpit, bot only works in owner 1:1 DM. Slash fallback `/stato` reads approved projections with timestamps. Stale/unavailable = UNKNOWN.
+Do not treat Claude/ChatGPT connector tokens as available to Hermes or Cloudflare by default. Add integrations through explicit authorization.
 
-**G3 — Proactive event:** on new CI failing / verified source drift, send *one* DM with original URL, timestamp, and "Apri" / "Non ora" actions. Zero repeated DM for replayed events; optional daily brief.
+## Security critical path
 
-**G4 — Hermes specialist:** time-boxed compare on one repo reading/synthesis draft or automated tests, only if Think tools aren't adequate; documented extra latency/cost/permissions. No ambient access to family/health/faith data.
+Issue #14: JWT verification, owner identity, storage backup and Worker release reconciliation before granting Hermes access to private Life OS APIs. Agent execution scope is disjoint from read tools; user approval required for irreversible operations. Bots are not E2EE chat recipients. Sensitive personal/third-party content should remain in Access-protected UI unless specifically authorized.
 
-## Test gates (hard fail)
+Keep GitHub PR #17 **draft and on hold**, not merged, until an evidence-based comparison proves Hermes insufficient. No new Telegram bot, no new paid model, no Cloudflare Container or VPS subscription required for this decision.
 
-- Invalid Telegram webhook secret: 100% rejects; unpaired user and group: 100% denies access to personal tools.
-- Unknown or invalid Cloudflare Access JWT: 100% deny, even if forged header present.
-- Replay same event >=30 times: one ledger observation, max one Telegram alert.
-- User sends `/stato`: answer has source and last verified time, or explicitly not connected; no fabricated data.
-- No provider data: zero fabricated events, no "all clear" if provider couldn't be checked.
-- No irreversible write/spend/publish from chat without protected UI approval and receipt.
-- All P2 intimate content off by default for messenger and remote LLM; bot messages are not E2EE.
-- Costs visible: chosen provider, request budget, hard limit with "paused" semantics.
-- Rollback version/DO state/data independent.
+## Proof of success
 
-## Source references verified 2026-10-13
+1. Existing Soliwkr Telegram DM is confirmed to be served by one known Hermes gateway.
+2. Local paths and host shown by bot are corroborated by shell, not by the model reply.
+3. Without manual data entry, one actual GitHub/Cloudflare event appears in the Life OS ledger and generates exactly one Telegram alert with original link and time.
+4. No private-data leak, duplicate messages, automatic spends or unauthorized agent writes.
 
-- Cloudflare Think (agent loop, DO memory): https://developers.cloudflare.com/agents/harnesses/think/
-- Cloudflare Think Telegram (signed webhook): https://github.com/cloudflare/agents/blob/main/docs/think/messengers.md
-- Cloudflare official Chat SDK messenger starter: https://github.com/cloudflare/agents/tree/main/examples/chat-sdk-messenger
-- Hermes official isolated profiles: https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/profiles.md
-- Hermes CF plugin is community and scopes only tool execution, not the gateway: https://github.com/NousResearch/hermes-agent/blob/main/plugin-catalog/cloudflare-sandbox.yaml
-- Cloudflare Containers consumption-based billing: https://developers.cloudflare.com/containers/platform/pricing/
+## Relevant official docs
+
+- Hermes gateway service management: https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/messaging/index.md
+- Hermes Telegram channel: https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/messaging/telegram.md
+- Cloudflare Think alternative: https://developers.cloudflare.com/agents/harnesses/think/
