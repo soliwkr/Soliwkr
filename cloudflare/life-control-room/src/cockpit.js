@@ -6,7 +6,7 @@ const COCKPIT = [
   '<div class="mc-ribbon" aria-live="polite"><span class="mc-lamp" id="mc-lamp"></span><b id="mc-readiness">Verifico le fonti…</b><span class="mc-stamp" id="mc-stamp">Nessuna verifica completata</span><span class="mc-legend">Sconosciuto ≠ zero · Attività ≠ risultato</span></div>',
   '<div class="mc-layout">',
   '<article class="mc-card mc-source"><div class="mc-card-title"><div><small>01 / INFRASTRUTTURA</small><h3>Il sistema</h3></div><span class="mc-mark">◈</span></div>',
-  '<div class="mc-stack"><div class="mc-line"><span>Life OS · Worker</span><b id="mc-worker">In verifica</b></div><div class="mc-line"><span>Archivio personale · D1</span><b id="mc-d1">In verifica</b></div><div class="mc-line"><span>Fonti GitHub</span><b id="mc-github">In verifica</b></div><div class="mc-line"><span>Eventi automatici</span><b class="mc-unlinked">Non collegati</b></div></div>',
+  '<div class="mc-stack"><div class="mc-line"><span>Life OS · Worker</span><b id="mc-worker">In verifica</b></div><div class="mc-line"><span>Archivio personale · D1</span><b id="mc-d1">In verifica</b></div><div class="mc-line"><span>Fonti GitHub</span><b id="mc-github">In verifica</b></div><div class="mc-line"><span>Eventi automatici</span><b class="mc-unlinked" id="mc-events-status">Non verificati</b></div></div>',
   '<div class="mc-end"><span>Ultimo segnale: <span id="mc-source-time">non verificato</span></span><button data-go="sistemi" class="mc-go">Connessioni ↗</button></div></article>',
   '<article class="mc-card mc-agents"><div class="mc-card-title"><div><small>02 / AGENTI</small><h3>Jarvis & capacità</h3></div><span class="mc-mark">✳</span></div>',
   '<div class="mc-stack"><div class="mc-line"><span>Jarvis · Cloudflare Think</span><b class="mc-unlinked">Da attivare</b></div><div class="mc-line"><span>Hermes · VPS</span><b class="mc-unknown">Non verificato</b></div><div class="mc-line"><span>Hermes · laptop</span><b class="mc-neutral">Opzionale</b></div><div class="mc-line"><span>Telegram · Jarvis</span><b class="mc-unlinked">Non collegato</b></div></div>',
@@ -17,7 +17,7 @@ const COCKPIT = [
   '<div class="mc-end"><span>Memorie dichiarate, non interpretazioni AI</span><button data-go="mente" class="mc-go">Cervello ↗</button></div></article>',
   '<article class="mc-card mc-portfolio"><div class="mc-card-title"><div><small>04 / STUDIO</small><h3>Portfolio osservabile</h3></div><span class="mc-mark">↗</span></div>',
   '<p class="mc-note">Ultima attività dei repository pubblici collegati. Non misura clienti, ricavi o successo commerciale.</p>',
-  '<div class="mc-projects" id="mc-projects"><div class="mc-row"><span>Verifico GitHub…</span></div></div>',
+  '<div class="mc-events" id="mc-events"><span>Ultimo evento: in verifica</span></div><div class="mc-projects" id="mc-projects"><div class="mc-row"><span>Verifico GitHub…</span></div></div>',
   '<div class="mc-end"><span id="mc-project-time">Fonte: GitHub · attendo</span><button data-go="studio" class="mc-go">Tutti i progetti ↗</button></div></article>',
   '<article class="mc-card mc-next"><div class="mc-card-title"><div><small>05 / PROSSIMO GATE</small><h3>Da stabilizzare</h3></div><span class="mc-mark">◎</span></div>',
   '<div class="mc-gate"><b>Identità → Release → Eventi → Jarvis</b><p>Verifica JWT e backup prima di autorizzare agenti e fonti private. Poi ingestion automatica e briefing.</p></div>',
@@ -58,7 +58,7 @@ const MC_STYLE = `
 .mc-number{font-size:43px;font-weight:790;letter-spacing:-.06em;line-height:1;margin:2px 0 0;color:var(--violet)}
 .mc-number-label{font-size:11px;color:#b3a7ce;margin:-7px 0 4px}
 .mc-note{font-size:11px;color:#9bad9e;margin:0}
-.mc-projects{display:grid;gap:1px;max-height:137px;overflow-y:auto}
+.mc-events{background:#202b24;border:1px solid #334637;border-radius:9px;padding:9px;font-size:10px;color:#bdcabe}.mc-events a{color:var(--accent);text-decoration:none}.mc-projects{display:grid;gap:1px;max-height:115px;overflow-y:auto}
 .mc-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;border-bottom:1px solid #33443870;color:#ced8cc;font-size:11px;text-decoration:none}
 .mc-row em{font-style:normal;color:#93a795;font-size:10px}
 .mc-row:hover{color:var(--accent)}
@@ -104,7 +104,7 @@ function installMissionControl() {
   async function refreshMissionControl(){
     if(busy)return;busy=true;text('mc-readiness','Aggiorno le fonti…');
     $('mc-refresh').disabled=true;
-    var results=await Promise.allSettled([read('/api/health'),read('/api/state'),read('/api/knowledge'),read('/api/projects')]);
+    var results=await Promise.allSettled([read('/api/health'),read('/api/state'),read('/api/knowledge'),read('/api/projects'),read('/api/observations')]);
     var good=0;
     var health=results[0];
     if(health.status==='fulfilled'){
@@ -144,11 +144,29 @@ function installMissionControl() {
       }
     }
     if(results[3].status!=='fulfilled'){host.append(item('div','mc-row','Fonte GitHub non verificata'));text('mc-github','Non verificato');text('mc-project-time','Fonte: non disponibile');}
+    var ehost=$('mc-events');
+    ehost.replaceChildren();
+    if(results[4].status==='fulfilled'){
+      var ledger=results[4].value,checks=Array.isArray(ledger.sources)?ledger.sources:[],list=Array.isArray(ledger.events)?ledger.events:[];
+      var ok=checks.filter(function(x){return x.status==='ok'}).length;
+      if(ok)good++;
+      text('mc-events-status',ok?ok+' sorgenti aggiornate':checks.length?'Fonti non disponibili':'In attesa del primo ciclo');
+      if(list.length){
+        var last=list[0],source;
+        try{source=new URL(last.source_url);}catch(e){source=null}
+        var label=String(last.summary||'Evento tecnico').slice(0,110)+' · '+date(last.occurred_at);
+        if(source&&source.protocol==='https:'&&source.hostname==='github.com'){
+          var a=item('a','',label+' ↗');a.href=source.href;a.target='_blank';a.rel='noopener noreferrer';ehost.append(a);
+        }else ehost.append(item('span','',label));
+      }else ehost.append(item('span','',checks.length?'Nessun evento verificabile nell’ultimo ciclo':'L’acquisizione automatica non è ancora partita'));
+    }else{
+      text('mc-events-status','Non verificati');ehost.append(item('span','','Cron/source ledger non disponibili'));
+    }
     var complete=new Date();
     text('mc-stamp','Verifica: '+date(complete.toISOString()));
     text('mc-source-time',date(complete.toISOString()));
-    text('mc-readiness',good===4?'4 fonti interrogate · AIOS accessibile':good>0?good+' fonti interrogate · altre da verificare':'Impossibile leggere le fonti');
-    $('mc-lamp').classList.toggle('good',good===4);
+    text('mc-readiness',good===5?'5 fonti interrogate · AIOS accessibile':good>0?good+' fonti interrogate · altre da verificare':'Impossibile leggere le fonti');
+    $('mc-lamp').classList.toggle('good',good===5);
     busy=false;$('mc-refresh').disabled=false;
   }
   $('mc-refresh').addEventListener('click',refreshMissionControl);
