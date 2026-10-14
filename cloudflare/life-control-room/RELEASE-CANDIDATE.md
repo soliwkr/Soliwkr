@@ -116,3 +116,20 @@ Remediation in RC branch:
 - Tests cover the native Access context being unavailable (JWT required), correct owner+aud, wrong owner+aud and missing/failed identity lookup. Signed JWT still fails closed on forged/expired credentials. `AIOS_PLATFORM_AUTH` is an operator-only Worker configuration variable, never accepted from a request.
 - **Release blockers remain**: an independently documented production data backup/export and recovery rehearsal or agreed PITR rollback, controlled D1 0003 migration, review/merge approval, actual production 200/401 authorization smoke, one real GitHub event and release SHA traceability. No production rollout has occurred.
 
+
+
+### G0-B — EU D1 restore-copy validated, 2026-10-14
+
+**Owner requested continuation after authenticated staging confirmation.** Actions made directly in Cloudflare using the connected account, *without changing the production Worker or writing to production D1*:
+
+- Created isolated **EU D1** recovery database `soliwkr-life-room-backup-20261014`, disabled read replication, **no Worker binding and no public route**. This is a separate database, but **within the same Cloudflare account**; it is NOT an off-account or off-platform backup.
+- Reconstructed the original four production tables and indexes/constraints from the canonical schema/migrations (not a loose JSON-only copy).
+- Restored every existing row into that recovery DB through Cloudflare D1 API parameterized writes **without placing payload content in repository, issue, logs or assistant text**.
+- Verified production/backup row totals and SHA-256 equality of canonical, ordered field values: `private_state 1/1`, `change_events 15/15`, `knowledge_sources 0/0`, `knowledge_cards 0/0`. **All four passed.**
+- Verified via `PRAGMA table_info`, `index_list`, `foreign_key_list` that each table's schema and constraints match. **4/4 passed.**
+- Production D1 Time Travel bookmark remains available. Staging (fixture only) Time Travel restore rehearsal previously passed.
+- D1 SQL export API returned `status=complete` and a temporary signed URL, but the current tool's network restrictions **blocked downloading the private SQL dump**. No SQL file was saved; no claim of offsite retention or independent SQL-file import is made. `PRAGMA integrity_check` was rejected by the remote D1 API authorizer; row hashes + schema equivalence were used instead.
+
+**Outcome:** recoverable **same-account EU D1 copy verified PASS**, separate from production and preserved unmodified as the pre-release checkpoint. A stronger cross-account/offsite encrypted backup is still outstanding; do not advertise full disaster recovery from account/provider loss. Retain the snapshot until a later protected/offsite backup supersedes it; no automatic deletion without retention policy.
+
+**Remaining RC gate:** human-approved merge/deploy, additive production `0003_source_events.sql` migration, real production owner 200/nonowner 401 smoke and rollback procedure. User confirmation of *staging* is NOT a blanket claim that production authentication was tested. **Release not performed in this checkpoint.**
