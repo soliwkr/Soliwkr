@@ -33,7 +33,7 @@ test('no unconnected feature is advertised as online or synthetic business succe
  const html=injectCockpit(injectMemory(injectAtlas(HTML)));
  assert.match(html,/Hermes · VPS/);
  assert.match(html,/Non verificato/);
- assert.match(html,/Jarvis · Cloudflare Think/);
+ assert.match(html,/SOLIWKR · Cloudflare Think/);
  assert.match(html,/Da attivare/);
  assert.match(html,/Eventi automatici/);
  assert.match(html,/Non verificati/);
@@ -41,5 +41,5 @@ test('no unconnected feature is advertised as online or synthetic business succe
  assert.match(html,/id="mc-events"/);
  assert.match(html,/Attività ≠ risultato/);
  assert.match(html,/Sconosciuto ≠ zero/);
- assert.ok(!html.includes('Jarvis online'));
+ assert.ok(!html.includes('SOLIWKR online'));
 });
