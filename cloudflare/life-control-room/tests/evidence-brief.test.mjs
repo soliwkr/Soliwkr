@@ -13,3 +13,15 @@ test('24h window uses occurred_at, not backfill observed_at',async()=>{const res
 test('unknown source never claims no activity',async()=>{const d=await(await evidenceBrief(request(),db(),now)).json();assert.equal(d.source_status,'unknown');assert.match(d.answer,/non posso concludere/)});
 test('stale sources are partial',async()=>{const d=await(await evidenceBrief(request(),db([],[{status:'ok',checked_at:'2026-10-14T12:00:00Z'}]),now)).json();assert.equal(d.source_status,'partial')});
 test('ledger failure is 503',async()=>{const broken={prepare(){throw Error('missing migration')}};assert.equal((await evidenceBrief(request(),broken,now)).status,503)});
+
+test('AI synthesis is bounded and retains server-owned citations',async()=>{
+ let called=0;
+ const ai={async run(model,input){called++;assert.equal(input.temperature,0);assert.equal(input.max_tokens,220);return{response:'Un push GitHub verificato.'}}};
+ const d=await(await evidenceBrief(request(),db([e('2026-10-15T10:00:00Z')],[{status:'ok',checked_at:'2026-10-15T11:00:00Z'}]),now,ai)).json();
+ assert.equal(called,1);assert.equal(d.mode,'ai_grounded_brief');assert.equal(d.events.length,1);assert.equal(d.events[0].url,'https://github.com/soliwkr/Soliwkr/commit/abc');
+});
+test('AI failure returns deterministic answer without losing sources',async()=>{
+ const ai={async run(){throw Error('rate limited')}};
+ const d=await(await evidenceBrief(request(),db([e('2026-10-15T10:00:00Z')]),now,ai)).json();
+ assert.equal(d.mode,'deterministic_evidence_brief');assert.equal(d.events.length,1);
+});
