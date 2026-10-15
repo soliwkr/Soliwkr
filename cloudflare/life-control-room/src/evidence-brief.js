@@ -30,7 +30,7 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
     {role:'user',content:JSON.stringify({question:body.question,facts})}
    ],temperature:0,max_tokens:220});
    aiDiagnostic='invalid_output';
-   const candidate=typeof output?.response==='string'?output.response:typeof output?.result?.response==='string'?output.result.response:typeof output?.output_text==='string'?output.output_text:null;
+   const candidate=typeof output?.response==='string'?output.response:typeof output?.result?.response==='string'?output.result.response:typeof output?.output_text==='string'?output.output_text:typeof output?.choices?.[0]?.message?.content==='string'?output.choices[0].message.content:null;
    if(!candidate&&output?.errors?.length)aiDiagnostic='provider_error_response';
    const raw=candidate?.trim()||'';
    let parsed=null;
