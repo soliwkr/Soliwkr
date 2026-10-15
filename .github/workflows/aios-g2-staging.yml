@@ -36,7 +36,7 @@ jobs:
           const stage=c.env?.staging;
           if(stage?.name!=='soliwkr-life-room-stage' ||
              stage?.vars?.AIOS_HOST!=='aios-stage.soliwkr.pro' ||
-             stage?.vars?.AIOS_G2_AI_ENABLED!=='disabled' ||
+             stage?.vars?.AIOS_G2_AI_ENABLED!=='enabled' ||
              stage?.ai?.binding!=='AI' ||
              stage?.d1_databases?.[0]?.database_id!=='8a539b62-0070-476c-8ebe-f9dc354e09d9' ||
              stage?.routes?.[0]?.pattern!=='aios-stage.soliwkr.pro')
