@@ -1,0 +1,7 @@
+{
+  "extends": "agents/tsconfig",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false
+  }
+}

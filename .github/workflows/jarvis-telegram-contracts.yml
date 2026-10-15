@@ -1,0 +1,26 @@
+name: Jarvis Telegram Contracts
+on:
+  pull_request:
+    paths:
+      - "cloudflare/jarvis-agent/**"
+      - ".github/workflows/jarvis-telegram-contracts.yml"
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: cloudflare/jarvis-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install official Cloudflare Think dependencies
+        run: npm install --no-audit --no-fund
+      - name: Reject unauthorized Telegram traffic
+        run: npm test
+      - name: Check TypeScript and official adapter compatibility
+        run: npm run typecheck
