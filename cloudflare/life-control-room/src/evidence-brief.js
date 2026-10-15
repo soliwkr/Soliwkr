@@ -1,4 +1,4 @@
-// G2 read-only evidence briefing. No LLM, no fabricated agent capabilities.
+// G2 read-only evidence briefing. Optional bounded LLM; no fabricated agent capabilities.
 const HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store, private'};
 export async function evidenceBrief(request,db,now=new Date(),ai=null){
  if(request.method!=='POST')return new Response(JSON.stringify({error:'Method not allowed'}),{status:405,headers:HEADERS});
@@ -14,9 +14,11 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
  const rows=(events.results||[]).filter(x=>x.source_url?.startsWith('https://github.com/')&&Number.isFinite(Date.parse(x.occurred_at))&&Number.isFinite(Date.parse(x.observed_at)));
  const sources=checks.results||[];
  const status=sources.length===0?'unknown':sources.some(x=>x.status!=='ok'||!Number.isFinite(Date.parse(x.checked_at))||now.getTime()-Date.parse(x.checked_at)>7200000)?'partial':'ok';
+ const unavailable_sources=sources.filter(x=>x.status!=='ok'||!Number.isFinite(Date.parse(x.checked_at))||now.getTime()-Date.parse(x.checked_at)>7200000).map(x=>({repo:x.source_key,status:x.status==='ok'?'stale':'unavailable'}));
  const lines=rows.map(x=>({text:x.summary,repo:x.source_key,occurred_at:x.occurred_at,observed_at:x.observed_at,url:x.source_url}));
  const answer=lines.length?`Nelle ultime 24 ore risultano ${lines.length} eventi GitHub verificabili nel registro (massimo 25 mostrati). ${status==='ok'?'Le sorgenti controllate risultano aggiornate.':'Alcune sorgenti sono assenti, non aggiornate o in errore: il riepilogo potrebbe essere incompleto.'}`:`Non risultano eventi GitHub verificabili nelle ultime 24 ore nel registro. ${status==='ok'?'Questo non dimostra che non ci sia stata attività fuori dalle sorgenti monitorate.':'Le sorgenti non sono tutte aggiornate: non posso concludere che non ci sia stata attività.'}`;
- let finalAnswer=answer,mode='deterministic_evidence_brief';
+ const safeAnswer=unavailable_sources.length?answer+` Copertura incompleta: ${unavailable_sources.length} sorgenti non accessibili o non aggiornate (${unavailable_sources.map(x=>x.repo).join(', ')}).`:answer;
+ let finalAnswer=safeAnswer,mode='deterministic_evidence_brief';
  // Optional bounded Workers AI synthesis: source references remain server-owned.
  if(ai&&lines.length){
   try{
@@ -26,9 +28,9 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
     {role:'user',content:JSON.stringify({question:body.question,source_status:status,facts})}
    ],temperature:0,max_tokens:220});
    const candidate=typeof output?.response==='string'?output.response.trim():'';
-   if(candidate&&candidate.length<=1200){finalAnswer=candidate;mode='ai_grounded_brief';}
+   if(candidate&&candidate.length<=1200){finalAnswer=candidate+'\n\n'+(unavailable_sources.length?`Copertura incompleta: ${unavailable_sources.map(x=>x.repo).join(', ')}.`:'');mode='ai_grounded_brief';}
   }catch{/* Fail closed to deterministic evidence brief. */}
  }
- return new Response(JSON.stringify({mode,question:body.question,answer:finalAnswer,window:{from:start,to:end},source_status:status,events:lines}),{headers:HEADERS});
+ return new Response(JSON.stringify({mode,question:body.question,answer:finalAnswer,window:{from:start,to:end},source_status:status,unavailable_sources,events:lines}),{headers:HEADERS});
  }catch{return new Response(JSON.stringify({error:'Evidence ledger unavailable'}),{status:503,headers:HEADERS});}
 }
