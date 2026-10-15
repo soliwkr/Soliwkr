@@ -1,0 +1,72 @@
+name: AIOS G2 staging deploy
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aios-g2-staging
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    # Never deploy a PR branch without explicit selection and approval.
+    if: github.ref == 'refs/heads/feat/soliwkr-g2-evidence-chat'
+    runs-on: ubuntu-latest
+    environment: aios-staging
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: cloudflare/life-control-room
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run contracts
+        run: npm test
+      - name: Validate staging configuration and guard production
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const c=JSON.parse(readFileSync('wrangler.json','utf8'));
+          const stage=c.env?.staging;
+          if(stage?.name!=='soliwkr-life-room-stage' ||
+             stage?.vars?.AIOS_HOST!=='aios-stage.soliwkr.pro' ||
+             stage?.vars?.AIOS_G2_AI_ENABLED!=='disabled' ||
+             stage?.ai?.binding!=='AI' ||
+             stage?.d1_databases?.[0]?.database_id!=='8a539b62-0070-476c-8ebe-f9dc354e09d9' ||
+             stage?.routes?.[0]?.pattern!=='aios-stage.soliwkr.pro')
+             throw Error('Staging guard failed; deployment aborted');
+          NODE
+      - name: Validate Cloudflare token availability
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing staging Cloudflare API token'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'Missing staging Cloudflare account id'; exit 1; }
+      - name: Check remote Access secrets and isolated D1 before deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/soliwkr-life-room-stage/settings" \
+            -o /tmp/aios-stage-settings.json
+          jq -e '
+            .success == true and
+            ([.result.bindings[] | select(.type == "secret_text") | .name] | index("ACCESS_OWNER_EMAIL") != null) and
+            ([.result.bindings[] | select(.type == "secret_text") | .name] | index("STAGE_ACCESS_JWKS") != null) and
+            ([.result.bindings[] | select(.type == "d1" and .name == "LIFE_DB" and .database_id == "8a539b62-0070-476c-8ebe-f9dc354e09d9")] | length == 1)
+          ' /tmp/aios-stage-settings.json >/dev/null || { echo 'Remote staging Access/D1 guard failed'; exit 1; }
+      - name: Deploy staging only, preserve remote secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --env staging --keep-vars
