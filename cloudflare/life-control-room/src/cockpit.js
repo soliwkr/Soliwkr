@@ -185,6 +185,7 @@ export function injectCockpit(html){
   html=html.replace(end,'</div></div></details>\n</section>\n<section class="view" id="view-vita"');
   html=html.replace('</style>',MC_STYLE+'</style>');
   html=html.replace('init();\n})();','('+installMissionControl.toString()+')();\ninit();\n})();');
+  if(!html.includes('</body>'))throw new Error('Missing HTML body anchor');
   return html.replace('</body>',G2_SCRIPT+'</body>');
 }
 
