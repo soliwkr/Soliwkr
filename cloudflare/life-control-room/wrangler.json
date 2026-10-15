@@ -40,7 +40,7 @@
         "AIOS_AUTH_DIAGNOSTICS": "enabled",
         "STAGE_JWKS_FALLBACK": "enabled",
         "AIOS_PLATFORM_AUTH": "enabled",
-        "AIOS_G2_AI_ENABLED": "disabled"
+        "AIOS_G2_AI_ENABLED": "enabled"
       },
       "d1_databases": [
         {
