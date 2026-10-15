@@ -8,10 +8,10 @@ const COCKPIT = [
   '<article class="mc-card mc-source"><div class="mc-card-title"><div><small>01 / INFRASTRUTTURA</small><h3>Il sistema</h3></div><span class="mc-mark">◈</span></div>',
   '<div class="mc-stack"><div class="mc-line"><span>Life OS · Worker</span><b id="mc-worker">In verifica</b></div><div class="mc-line"><span>Archivio personale · D1</span><b id="mc-d1">In verifica</b></div><div class="mc-line"><span>Fonti GitHub</span><b id="mc-github">In verifica</b></div><div class="mc-line"><span>Eventi automatici</span><b class="mc-unlinked" id="mc-events-status">Non verificati</b></div></div>',
   '<div class="mc-end"><span>Ultimo segnale: <span id="mc-source-time">non verificato</span></span><button data-go="sistemi" class="mc-go">Connessioni ↗</button></div></article>',
-  '<article class="mc-card mc-agents"><div class="mc-card-title"><div><small>02 / AGENTI</small><h3>Jarvis & capacità</h3></div><span class="mc-mark">✳</span></div>',
-  '<div class="mc-stack"><div class="mc-line"><span>Jarvis · Cloudflare Think</span><b class="mc-unlinked">Da attivare</b></div><div class="mc-line"><span>Hermes · VPS</span><b class="mc-unknown">Non verificato</b></div><div class="mc-line"><span>Hermes · laptop</span><b class="mc-neutral">Opzionale</b></div><div class="mc-line"><span>Telegram · Jarvis</span><b class="mc-unlinked">Non collegato</b></div></div>',
+  '<article class="mc-card mc-agents"><div class="mc-card-title"><div><small>02 / AGENTI</small><h3>SOLIWKR & capacità</h3></div><span class="mc-mark">✳</span></div>',
+  '<div class="mc-stack"><div class="mc-line"><span>SOLIWKR · Cloudflare Think</span><b class="mc-unlinked">Da attivare</b></div><div class="mc-line"><span>Hermes · VPS</span><b class="mc-unknown">Non verificato</b></div><div class="mc-line"><span>Hermes · laptop</span><b class="mc-neutral">Opzionale</b></div><div class="mc-line"><span>Telegram · SOLIWKR</span><b class="mc-unlinked">Non collegato</b></div></div>',
   '<div class="mc-stack"><button type="button" class="mc-refresh" id="soliwkr-brief">Cosa è successo nelle ultime 24 ore?</button><div id="soliwkr-brief-result" role="status" aria-live="polite"></div></div>',
-  '<div class="mc-end"><span>Nessun agente riceve dati privati automaticamente</span><a href="https://github.com/soliwkr/Soliwkr/issues/16" rel="noopener noreferrer" target="_blank" class="mc-go">Piano Jarvis ↗</a></div></article>',
+  '<div class="mc-end"><span>Nessun agente riceve dati privati automaticamente</span><a href="https://github.com/soliwkr/Soliwkr/issues/16" rel="noopener noreferrer" target="_blank" class="mc-go">Piano SOLIWKR ↗</a></div></article>',
   '<article class="mc-card mc-brain"><div class="mc-card-title"><div><small>03 / MEMORIA</small><h3>Il Cervello</h3></div><span class="mc-mark">◇</span></div>',
   '<p class="mc-number" id="mc-knowledge">—</p><p class="mc-number-label">conoscenze approvate</p>',
   '<div class="mc-stack"><div class="mc-line"><span>Note originali</span><b id="mc-notes">In verifica</b></div><div class="mc-line"><span>Sincronizzazione Obsidian</span><b class="mc-unlinked">Solo export</b></div></div>',
@@ -21,11 +21,11 @@ const COCKPIT = [
   '<div class="mc-events" id="mc-events"><span>Ultimo evento: in verifica</span></div><div class="mc-projects" id="mc-projects"><div class="mc-row"><span>Verifico GitHub…</span></div></div>',
   '<div class="mc-end"><span id="mc-project-time">Fonte: GitHub · attendo</span><button data-go="studio" class="mc-go">Tutti i progetti ↗</button></div></article>',
   '<article class="mc-card mc-next"><div class="mc-card-title"><div><small>05 / PROSSIMO GATE</small><h3>Da stabilizzare</h3></div><span class="mc-mark">◎</span></div>',
-  '<div class="mc-gate"><b>Identità → Release → Eventi → Jarvis</b><p>Verifica JWT e backup prima di autorizzare agenti e fonti private. Poi ingestion automatica e briefing.</p></div>',
+  '<div class="mc-gate"><b>Identità → Release → Eventi → SOLIWKR</b><p>Verifica JWT e backup prima di autorizzare agenti e fonti private. Poi ingestion automatica e briefing.</p></div>',
   '<div class="mc-end"><span>Implementazione e rilascio sono stati diversi</span><a class="mc-go" href="https://github.com/soliwkr/Soliwkr/issues/14" target="_blank" rel="noopener noreferrer">Gate G0 ↗</a></div></article>',
   '<article class="mc-card mc-map"><div class="mc-card-title"><div><small>06 / ATLANTE</small><h3>Tutto è collegabile.</h3></div><span class="mc-mark">◎</span></div><p class="mc-map-copy">Esplora le relazioni strutturali e quelle dichiarate. Le ipotesi non sono verità.</p><div class="mc-map-visual" aria-hidden="true"><span>✳</span><i></i><span>◈</span><i></i><span>◇</span></div><div class="mc-end"><span>Source-aware · Obsidian export</span><button data-go="grafo" class="mc-go">Apri Atlante ↗</button></div></article>',
   '</div>',
-  '<div class="mc-privacy"><span>🔒 Schermata privata</span><span>Jarvis non ancora attivo · VPS non ancora verificata · Nessun evento inventato.</span></div>',
+  '<div class="mc-privacy"><span>🔒 Schermata privata</span><span>SOLIWKR non ancora attivo · VPS non ancora verificata · Nessun evento inventato.</span></div>',
   '</div>'
 ].join('');
 
