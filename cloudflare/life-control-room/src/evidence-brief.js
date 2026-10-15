@@ -41,7 +41,9 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
    const ids=parsed?.ids;
    if(parsed&&Object.keys(parsed).length===1&&Array.isArray(ids)&&ids.length>0&&ids.length<=facts.length&&ids.every(id=>Number.isInteger(id)&&id>=1&&id<=facts.length)&&new Set(ids).size===ids.length){
     const selected=ids.map(id=>lines[id-1]);
-    finalAnswer=`SOLIWKR ha selezionato ${selected.length} eventi dal registro verificabile delle ultime 24 ore:\n`+selected.map(x=>`• ${x.repo}: ${x.text}`).join('\n')+'\n\n'+safeAnswer;
+    const byRepo=new Map();
+    for(const event of selected)byRepo.set(event.repo,(byRepo.get(event.repo)||0)+1);
+    finalAnswer=`Nelle ultime 24 ore: ${selected.length} eventi selezionati e verificabili. `+[...byRepo].map(([repo,count])=>`${repo}: ${count} ${count===1?'evento':'eventi'}`).join('; ')+'. '+(unavailable_sources.length?`Copertura incompleta: ${unavailable_sources.length} sorgenti non accessibili o non aggiornate (${unavailable_sources.map(x=>x.repo).join(', ')}).`:'Le sorgenti controllate risultano aggiornate.')+' I collegamenti alle evidenze sono riportati sotto.';
     mode='ai_evidence_selection';
     aiDiagnostic='validated';
    }
