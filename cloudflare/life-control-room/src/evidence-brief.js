@@ -25,15 +25,16 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
   const aiStarted=Date.now();
   try{
    const facts=lines.slice(0,12).map((x,i)=>({id:i+1,summary:x.text,repo:x.repo,occurred_at:x.occurred_at}));
-   const output=await ai.run('@cf/meta/llama-3.1-8b-instruct-fp8-fast',{messages:[
+   const output=await ai.run('@cf/meta/llama-3.1-8b-instruct-fast',{messages:[
     {role:'system',content:'Sei un selettore di evidenze, non un narratore. Restituisci SOLO JSON valido: {"ids":[numeri interi]} con ID presenti nei fatti. Ordina gli eventi più rilevanti per la domanda. Non produrre testo, spiegazioni o altri campi.'},
     {role:'user',content:JSON.stringify({question:body.question,facts})}
    ],temperature:0,max_tokens:220});
    aiDiagnostic='invalid_output';
    const candidate=typeof output?.response==='string'?output.response:typeof output?.result?.response==='string'?output.result.response:typeof output?.output_text==='string'?output.output_text:null;
+   if(!candidate&&output?.errors?.length)aiDiagnostic='provider_error_response';
    const raw=candidate?.trim()||'';
    let parsed=null;
-   if(!candidate)aiDiagnostic='missing_response_field';
+   if(!candidate&&aiDiagnostic!=='provider_error_response')aiDiagnostic='missing_response_field';
    else if(!raw)aiDiagnostic='empty_response';
    else if(raw.length>600)aiDiagnostic='oversized_response';
    else {try{parsed=JSON.parse(raw);}catch{aiDiagnostic='invalid_json';}}
