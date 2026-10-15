@@ -49,7 +49,7 @@ function request(path,method='GET',payload,auth=session,requestHeaders=headers){
 }
 async function send(db,path,method='GET',payload,auth=session,requestHeaders=headers){
   const response=await worker.fetch(request(path,method,payload,auth,requestHeaders),{...ENV_AUTH,LIFE_DB:db});
-  return {status:response.status,body:await response.json()};
+  return {status:response.status,body:response.headers.get('content-type')?.includes('application/json')?await response.json():{message:await response.text()}};
 }
 const fixture=(title,priority)=>({
   title,outcome:'A verifiable external result',why_now:'Direction approved work for next',
