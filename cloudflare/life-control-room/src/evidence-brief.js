@@ -30,10 +30,13 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
     {role:'user',content:JSON.stringify({question:body.question,facts})}
    ],temperature:0,max_tokens:220});
    aiDiagnostic='invalid_output';
-   const raw=typeof output?.response==='string'?output.response.trim():'';
+   const candidate=typeof output?.response==='string'?output.response:typeof output?.result?.response==='string'?output.result.response:typeof output?.output_text==='string'?output.output_text:null;
+   const raw=candidate?.trim()||'';
    let parsed=null;
-   if(raw.length>0&&raw.length<=600){try{parsed=JSON.parse(raw);}catch{aiDiagnostic='invalid_json';}}
-   else aiDiagnostic='missing_or_oversized_response';
+   if(!candidate)aiDiagnostic='missing_response_field';
+   else if(!raw)aiDiagnostic='empty_response';
+   else if(raw.length>600)aiDiagnostic='oversized_response';
+   else {try{parsed=JSON.parse(raw);}catch{aiDiagnostic='invalid_json';}}
    const ids=parsed?.ids;
    if(parsed&&Object.keys(parsed).length===1&&Array.isArray(ids)&&ids.length>0&&ids.length<=facts.length&&ids.every(id=>Number.isInteger(id)&&id>=1&&id<=facts.length)&&new Set(ids).size===ids.length){
     const selected=ids.map(id=>lines[id-1]);
