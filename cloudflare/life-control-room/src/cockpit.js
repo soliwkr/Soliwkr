@@ -10,6 +10,7 @@ const COCKPIT = [
   '<div class="mc-end"><span>Ultimo segnale: <span id="mc-source-time">non verificato</span></span><button data-go="sistemi" class="mc-go">Connessioni ↗</button></div></article>',
   '<article class="mc-card mc-agents"><div class="mc-card-title"><div><small>02 / AGENTI</small><h3>Jarvis & capacità</h3></div><span class="mc-mark">✳</span></div>',
   '<div class="mc-stack"><div class="mc-line"><span>Jarvis · Cloudflare Think</span><b class="mc-unlinked">Da attivare</b></div><div class="mc-line"><span>Hermes · VPS</span><b class="mc-unknown">Non verificato</b></div><div class="mc-line"><span>Hermes · laptop</span><b class="mc-neutral">Opzionale</b></div><div class="mc-line"><span>Telegram · Jarvis</span><b class="mc-unlinked">Non collegato</b></div></div>',
+  '<div class="mc-stack"><button type="button" class="mc-refresh" id="soliwkr-brief">Cosa è successo nelle ultime 24 ore?</button><div id="soliwkr-brief-result" role="status" aria-live="polite"></div></div>',
   '<div class="mc-end"><span>Nessun agente riceve dati privati automaticamente</span><a href="https://github.com/soliwkr/Soliwkr/issues/16" rel="noopener noreferrer" target="_blank" class="mc-go">Piano Jarvis ↗</a></div></article>',
   '<article class="mc-card mc-brain"><div class="mc-card-title"><div><small>03 / MEMORIA</small><h3>Il Cervello</h3></div><span class="mc-mark">◇</span></div>',
   '<p class="mc-number" id="mc-knowledge">—</p><p class="mc-number-label">conoscenze approvate</p>',
@@ -184,5 +185,7 @@ export function injectCockpit(html){
   html=html.replace(end,'</div></div></details>\n</section>\n<section class="view" id="view-vita"');
   html=html.replace('</style>',MC_STYLE+'</style>');
   html=html.replace('init();\n})();','('+installMissionControl.toString()+')();\ninit();\n})();');
-  return html;
+  return html.replace('</body>',G2_SCRIPT+'</body>');
 }
+
+const G2_SCRIPT = `<script>(function(){const b=document.getElementById('soliwkr-brief'),o=document.getElementById('soliwkr-brief-result');if(!b||!o)return;b.addEventListener('click',async()=>{b.disabled=true;o.textContent='Leggo le fonti…';try{const r=await fetch('/api/agent/brief',{method:'POST',headers:{'content-type':'application/json','x-control-room':'1'},body:JSON.stringify({question:'Cosa è successo nei miei progetti nelle ultime 24 ore?'})});if(!r.ok)throw Error('Fonte non disponibile ('+r.status+')');const d=await r.json();o.replaceChildren();const p=document.createElement('p');p.textContent=d.answer;o.append(p);for(const e of d.events||[]){const a=document.createElement('a');a.href=e.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=e.text+' · '+new Date(e.occurred_at).toLocaleString('it-IT')+' (acquisito '+new Date(e.observed_at).toLocaleString('it-IT')+')';const row=document.createElement('p');row.append(a);o.append(row)}}catch(e){o.textContent=e.message}finally{b.disabled=false}})})()</script>`;
