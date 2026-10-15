@@ -49,6 +49,22 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing staging Cloudflare API token'; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'Missing staging Cloudflare account id'; exit 1; }
+      - name: Check remote Access secrets and isolated D1 before deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/soliwkr-life-room-stage/settings" \
+            -o /tmp/aios-stage-settings.json
+          jq -e '
+            .success == true and
+            ([.result.bindings[] | select(.type == "secret_text") | .name] | index("ACCESS_OWNER_EMAIL") != null) and
+            ([.result.bindings[] | select(.type == "secret_text") | .name] | index("STAGE_ACCESS_JWKS") != null) and
+            ([.result.bindings[] | select(.type == "d1" and .name == "LIFE_DB" and .database_id == "8a539b62-0070-476c-8ebe-f9dc354e09d9")] | length == 1)
+          ' /tmp/aios-stage-settings.json >/dev/null || { echo 'Remote staging Access/D1 guard failed'; exit 1; }
       - name: Deploy staging only, preserve remote secrets
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
