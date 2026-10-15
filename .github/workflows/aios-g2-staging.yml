@@ -1,5 +1,11 @@
 name: AIOS G2 staging deploy
 on:
+  push:
+    branches:
+      - feat/soliwkr-g2-evidence-chat
+    paths:
+      - 'cloudflare/life-control-room/**'
+      - '.github/workflows/aios-g2-staging.yml'
   workflow_dispatch:
 
 permissions:
@@ -11,7 +17,7 @@ concurrency:
 
 jobs:
   stage:
-    # Never deploy a PR branch without explicit selection and approval.
+    # Deploy only the designated staging branch; production remains excluded.
     if: github.ref == 'refs/heads/feat/soliwkr-g2-evidence-chat'
     runs-on: ubuntu-latest
     environment: aios-staging
