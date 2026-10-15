@@ -19,14 +19,17 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
  const answer=lines.length?`Nelle ultime 24 ore risultano ${lines.length} eventi GitHub verificabili nel registro (massimo 25 mostrati). ${status==='ok'?'Le sorgenti controllate risultano aggiornate.':'Alcune sorgenti sono assenti, non aggiornate o in errore: il riepilogo potrebbe essere incompleto.'}`:`Non risultano eventi GitHub verificabili nelle ultime 24 ore nel registro. ${status==='ok'?'Questo non dimostra che non ci sia stata attività fuori dalle sorgenti monitorate.':'Le sorgenti non sono tutte aggiornate: non posso concludere che non ci sia stata attività.'}`;
  const safeAnswer=unavailable_sources.length?answer+` Copertura incompleta: ${unavailable_sources.length} sorgenti non accessibili o non aggiornate (${unavailable_sources.map(x=>x.repo).join(', ')}).`:answer;
  let finalAnswer=safeAnswer,mode='deterministic_evidence_brief';
+ let aiDiagnostic=ai?'not_attempted':'disabled',aiDurationMs=null;
  // Optional bounded Workers AI synthesis: source references remain server-owned.
  if(ai&&lines.length){
+  const aiStarted=Date.now();
   try{
    const facts=lines.slice(0,12).map((x,i)=>({id:i+1,summary:x.text,repo:x.repo,occurred_at:x.occurred_at}));
    const output=await ai.run('@cf/meta/llama-3.1-8b-instruct-fp8-fast',{messages:[
     {role:'system',content:'Sei un selettore di evidenze, non un narratore. Restituisci SOLO JSON valido: {"ids":[numeri interi]} con ID presenti nei fatti. Ordina gli eventi più rilevanti per la domanda. Non produrre testo, spiegazioni o altri campi.'},
     {role:'user',content:JSON.stringify({question:body.question,facts})}
    ],temperature:0,max_tokens:220});
+   aiDiagnostic='invalid_output';
    const raw=typeof output?.response==='string'?output.response.trim():'';
    const parsed=raw.length<=600?JSON.parse(raw):null;
    const ids=parsed?.ids;
@@ -34,9 +37,11 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
     const selected=ids.map(id=>lines[id-1]);
     finalAnswer=`SOLIWKR ha selezionato ${selected.length} eventi dal registro verificabile delle ultime 24 ore:\n`+selected.map(x=>`• ${x.repo}: ${x.text}`).join('\n')+'\n\n'+safeAnswer;
     mode='ai_evidence_selection';
+    aiDiagnostic='validated';
    }
-  }catch{/* Fail closed to deterministic evidence brief. */}
+  }catch{aiDiagnostic='inference_or_parse_error';/* Fail closed to deterministic evidence brief. */}
+  finally{aiDurationMs=Date.now()-aiStarted;}
  }
- return new Response(JSON.stringify({mode,question:body.question,answer:finalAnswer,window:{from:start,to:end},source_status:status,unavailable_sources,events:lines}),{headers:HEADERS});
+ return new Response(JSON.stringify({mode,ai_diagnostic:aiDiagnostic,ai_duration_ms:aiDurationMs,question:body.question,answer:finalAnswer,window:{from:start,to:end},source_status:status,unavailable_sources,events:lines}),{headers:HEADERS});
  }catch{return new Response(JSON.stringify({error:'Evidence ledger unavailable'}),{status:503,headers:HEADERS});}
 }
