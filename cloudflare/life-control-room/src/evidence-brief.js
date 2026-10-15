@@ -31,7 +31,9 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
    ],temperature:0,max_tokens:220});
    aiDiagnostic='invalid_output';
    const raw=typeof output?.response==='string'?output.response.trim():'';
-   const parsed=raw.length<=600?JSON.parse(raw):null;
+   let parsed=null;
+   if(raw.length>0&&raw.length<=600){try{parsed=JSON.parse(raw);}catch{aiDiagnostic='invalid_json';}}
+   else aiDiagnostic='missing_or_oversized_response';
    const ids=parsed?.ids;
    if(parsed&&Object.keys(parsed).length===1&&Array.isArray(ids)&&ids.length>0&&ids.length<=facts.length&&ids.every(id=>Number.isInteger(id)&&id>=1&&id<=facts.length)&&new Set(ids).size===ids.length){
     const selected=ids.map(id=>lines[id-1]);
@@ -39,7 +41,7 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
     mode='ai_evidence_selection';
     aiDiagnostic='validated';
    }
-  }catch{aiDiagnostic='inference_or_parse_error';/* Fail closed to deterministic evidence brief. */}
+  }catch{aiDiagnostic='inference_error';/* Fail closed to deterministic evidence brief. */}
   finally{aiDurationMs=Date.now()-aiStarted;}
  }
  return new Response(JSON.stringify({mode,ai_diagnostic:aiDiagnostic,ai_duration_ms:aiDurationMs,question:body.question,answer:finalAnswer,window:{from:start,to:end},source_status:status,unavailable_sources,events:lines}),{headers:HEADERS});
