@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS task_queue (id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,reason TEXT NOT NULL,evidence_url TEXT NOT NULL,owner TEXT NOT NULL CHECK(owner IN ('user','soliwkr')),due_at TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('active','done')),completion_proof TEXT,created_at TEXT NOT NULL,completed_at TEXT);
+CREATE UNIQUE INDEX IF NOT EXISTS task_queue_single_active ON task_queue(status) WHERE status='active';
