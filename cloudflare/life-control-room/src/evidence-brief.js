@@ -50,6 +50,7 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
   }catch{aiDiagnostic='inference_error';/* Fail closed to deterministic evidence brief. */}
   finally{aiDurationMs=Date.now()-aiStarted;}
  }
- return new Response(JSON.stringify({mode,ai_diagnostic:aiDiagnostic,ai_duration_ms:aiDurationMs,question:body.question,answer:finalAnswer,window:{from:start,to:end},source_status:status,unavailable_sources,events:lines}),{headers:HEADERS});
+ const next_action=unavailable_sources.length?{status:'blocked',title:'Ripristinare la copertura delle fonti GitHub',reason:`${unavailable_sources.length} sorgenti non accessibili o non aggiornate impediscono un briefing completo.`,evidence:unavailable_sources.map(x=>x.repo),completion:'Tutte le sorgenti configurate risultano aggiornate e accessibili al prossimo controllo.'}:{status:'review',title:'Verificare gli eventi prima di assegnare lavoro',reason:'Il registro dimostra attività, non dimostra automaticamente priorità o task completati.',evidence:lines.map(x=>x.url),completion:'Decisione e responsabile registrati nella coda operativa canonica.'};
+ return new Response(JSON.stringify({next_action,mode,ai_diagnostic:aiDiagnostic,ai_duration_ms:aiDurationMs,question:body.question,answer:finalAnswer,window:{from:start,to:end},source_status:status,unavailable_sources,events:lines}),{headers:HEADERS});
  }catch{return new Response(JSON.stringify({error:'Evidence ledger unavailable'}),{status:503,headers:HEADERS});}
 }
