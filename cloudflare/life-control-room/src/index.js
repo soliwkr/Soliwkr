@@ -18,7 +18,7 @@ const REPOS = [
 ['soliwkr/esim','SenzaRoaming','E-commerce'],
 ['soliwkr/gara-radar','Gara Radar','Utility'],
 ['soliwkr/sudpontino','Sud Pontino','Territorio'],
-['soliwkr/raccolto-app','Raccolto','Eventi'],
+['StudioPuraLuce/raccolto','Raccolto','Eventi'],
 ['soliwkr/rankempire-italia','RankEmpire Italia','Factory']
 ];
 const DEFAULT={focus:'',goals:[],inbox:[],notDoing:'',pillars:{}};
