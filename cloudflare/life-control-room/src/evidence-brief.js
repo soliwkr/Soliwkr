@@ -23,7 +23,7 @@ export async function evidenceBrief(request,db,now=new Date(),ai=null){
  if(ai&&lines.length){
   try{
    const facts=lines.slice(0,12).map((x,i)=>({id:i+1,summary:x.text,repo:x.repo,occurred_at:x.occurred_at}));
-   const output=await ai.run('@cf/meta/llama-3.1-8b-instruct',{messages:[
+   const output=await ai.run('@cf/meta/llama-3.1-8b-instruct-fp8-fast',{messages:[
     {role:'system',content:'Sei un selettore di evidenze, non un narratore. Restituisci SOLO JSON valido: {"ids":[numeri interi]} con ID presenti nei fatti. Ordina gli eventi più rilevanti per la domanda. Non produrre testo, spiegazioni o altri campi.'},
     {role:'user',content:JSON.stringify({question:body.question,facts})}
    ],temperature:0,max_tokens:220});
