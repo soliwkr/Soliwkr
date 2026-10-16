@@ -52,7 +52,7 @@ export function normalizeGithubEvent(input,slug,label,seenAt) {
   };
 }
 const url=slug=>"https://api.github.com/repos/"+slug+"/events?per_page=15";
-export async function collectGithubEvents(db,repos,fetcher=fetch,now=new Date()) {
+export async function collectGithubEvents(db,repos,fetcher=fetch,now=new Date(),githubToken=null) {
   const seenAt=now.toISOString();
   const receipts=[];
   for(const [slug,label] of repos){
@@ -61,7 +61,7 @@ export async function collectGithubEvents(db,repos,fetcher=fetch,now=new Date())
     let status="unknown",seen=0,added=0,code="none";
     try {
       const r=await fetcher(url(slug),{
-        headers:{"accept":"application/vnd.github+json","user-agent":"soliwkr-aios-events"},
+        headers:{"accept":"application/vnd.github+json","user-agent":"soliwkr-aios-events",...(githubToken?{"authorization":"Bearer "+githubToken}:{})},
         cf:{cacheTtl:0}
       });
       if(!r.ok)throw Error("http_"+r.status);
