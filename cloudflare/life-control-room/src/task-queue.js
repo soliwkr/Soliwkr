@@ -10,6 +10,11 @@ export async function taskQueue(request,db){
  if(request.headers.get('origin')!==new URL(request.url).origin||request.headers.get('x-control-room')!=='1'||!request.headers.get('content-type')?.startsWith('application/json'))return respond({error:'Invalid origin'},403);
  const raw=await request.text();if(raw.length>2048)return respond({error:'Too large'},413);
  let x;try{x=JSON.parse(raw)}catch{return respond({error:'Invalid JSON'},400)}
+ if(x.action==='defer'){
+  if(!Number.isInteger(x.id)||typeof x.reason!=='string'||x.reason.trim().length<12||x.reason.length>500)return respond({error:'Deferral reason required'},400);
+  const result=await db.prepare("UPDATE task_queue SET status='deferred',reason=reason || ' · RIMANDATO: ' || ? WHERE id=? AND status='active'").bind(x.reason.trim(),x.id).run();
+  return result.meta?.changes?respond({deferred:true,completed:false}):respond({error:'Active task not found'},409);
+ }
  if(x.action==='complete'){
   if(!Number.isInteger(x.id)||typeof x.proof!=='string'||x.proof.trim().length<12||x.proof.length>700)return respond({error:'Completion proof required'},400);
   const result=await db.prepare("UPDATE task_queue SET status='done',completion_proof=?,completed_at=datetime('now') WHERE id=? AND status='active'").bind(x.proof.trim(),x.id).run();
