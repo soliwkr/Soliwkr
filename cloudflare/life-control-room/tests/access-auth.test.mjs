@@ -67,8 +67,9 @@ test("unavailable JWKS or unknown signing key fails closed", async () => {
 
 test("every private Worker path is denied without a valid Access token", async () => {
   const env = { LIFE_DB: {}, ...ENV_AUTH };
-  for (const path of ["/", "/api/health", "/api/state", "/api/projects", "/api/knowledge", "/api/vault", "/api/knowledge/00000000-0000-0000-0000-000000000000"]) {
+  for (const path of ["/", "/backup/google", "/api/backup/google/start", "/api/backup/google/callback", "/api/backup/google/status", "/api/health", "/api/state", "/api/projects", "/api/knowledge", "/api/vault", "/api/knowledge/00000000-0000-0000-0000-000000000000"]) {
     assert.equal((await worker.fetch(new Request(BASE + path), env)).status, 401, path + " no token");
     assert.equal((await worker.fetch(new Request(BASE + path, { headers: { "cf-access-jwt-assertion": createToken({ email: "other@example.test" }) } }), env)).status, 401, path + " wrong owner");
   }
 });
+
