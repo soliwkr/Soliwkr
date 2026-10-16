@@ -122,3 +122,30 @@ test('nonowner rejected, forged origin rejected, unavailable schema is 503 not f
   assert.equal(unavailable.status,503);
   assert.equal((await unavailable.json()).error,'Command queue storage unavailable');
 });
+
+// Explicit executor selection prevents intake from silently creating a human obligation.
+test('capture requires an explicit executor and creates no records when omitted',async()=>{
+  const db=sqliteDB();
+  const payload=fixture('Synthetic explicit executor',10);
+  delete payload.assignee;
+  const result=await send(db,'/api/command-queue','POST',payload);
+  assert.equal(result.status,400);
+  assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_tasks').get().n,0);
+  assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_history').get().n,0);
+});
+test('failed audit writes roll back intake and return sanitized 503 on every write route',async()=>{
+  const db=sqliteDB();
+  db.native.exec("CREATE TRIGGER fail_audit BEFORE INSERT ON command_history BEGIN SELECT RAISE(ABORT, 'synthetic audit failure'); END");
+  const result=await send(db,'/api/command-queue','POST',fixture('Synthetic rollback',10));
+  assert.equal(result.status,503);
+  assert.deepEqual(result.body,{error:'Command queue storage unavailable'});
+  assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_tasks').get().n,0);
+  const unavailable={async batch(){throw Error('synthetic private storage detail')}};
+  for(const action of ['ready','finish']){
+    unavailable.prepare=()=>({bind(){return this}});
+    const response=await send(unavailable,'/api/command-queue/00000000-0000-0000-0000-000000000001/'+action,'POST',
+      {version:1,reason:'Synthetic reason',status:'DONE',evidence:'Synthetic evidence'});
+    assert.equal(response.status,503);
+    assert.deepEqual(response.body,{error:'Command queue storage unavailable'});
+  }
+});

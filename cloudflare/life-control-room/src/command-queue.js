@@ -43,7 +43,7 @@ export async function promoteNext(db) {
 async function capture(db,data) {
   if(!data||typeof data!=='object'||Array.isArray(data))return reply({error:'Invalid task'},400);
   const title=trim(data.title),outcome=trim(data.outcome),why=trim(data.why_now),done=trim(data.done_when);
-  const assignee=data.assignee??'human',kind=data.source_kind??'owner',source=trim(data.source_url??'');
+  const assignee=data.assignee,kind=data.source_kind??'owner',source=trim(data.source_url??'');
   const sourceStatus=data.source_status??'needs_verification',privacy=data.privacy_class??'private';
   const review=trim(data.review_at??''),priority=data.priority??50;
   if(!validText(title,180)||!validText(outcome,600)||!validText(why,600)||!validText(done,600)||
@@ -102,12 +102,12 @@ export async function commandQueueRequest(request,db,url) {
     if(raw.length>6500)return reply({error:'Too large'},413);
     let data;
     try { data=JSON.parse(raw); }catch { return reply({error:'Invalid JSON'},400); }
-    if(url.pathname==='/api/command-queue')return capture(db,data);
+    if(url.pathname==='/api/command-queue')return await capture(db,data);
     if(url.pathname==='/api/command-queue/next')return reply(await promoteNext(db));
     const path=/^\/api\/command-queue\/([0-9a-f-]{36})\/(ready|finish)$/.exec(url.pathname);
     if(!path)return reply({error:'Not found'},404);
-    if(path[2]==='ready')return ready(db,path[1],data);
-    return finish(db,path[1],data);
+    if(path[2]==='ready')return await ready(db,path[1],data);
+    return await finish(db,path[1],data);
   } catch {
     // Missing migration and infrastructure failures are not disguised as an empty queue.
     return reply({error:'Command queue storage unavailable'},503);
