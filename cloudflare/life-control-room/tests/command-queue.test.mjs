@@ -21,6 +21,7 @@ const idPattern=/^[0-9a-f-]{36}$/;
 function sqliteDB() {
   const native=new DatabaseSync(':memory:');
   native.exec(readFileSync(new URL('../migrations/0006_command_queue.sql',import.meta.url),'utf8'));
+  native.exec(readFileSync(new URL('../migrations/0007_command_priority_audit.sql',import.meta.url),'utf8'));
   const adapter={
     prepare(sql){
       let params=[];
@@ -176,4 +177,58 @@ test('committed READY and finish survive failed promotion and explicit next reco
     await send(db,'/api/command-queue/next','POST',{});
     assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_history').get().n,count);
   }
+});
+
+test('priority decisions retain initial, changed and unchanged rank with transition versions',async()=>{
+  const db=sqliteDB();
+  const a=await send(db,'/api/command-queue','POST',fixture('Synthetic audited rank',10));
+  const id=a.body.id;
+  const history=()=>db.native.prepare('SELECT id,action,previous_priority,resulting_priority,task_version FROM command_history WHERE task_id=? ORDER BY rowid').all(id);
+  assert.deepEqual({...history()[0],id:undefined},{id:undefined,action:'CAPTURED',previous_priority:null,resulting_priority:10,task_version:1});
+  assert.equal(db.native.prepare('SELECT last_transition FROM command_tasks WHERE id=?').get(id).last_transition,history()[0].id);
+  const ready=await send(db,`/api/command-queue/${id}/ready`,'POST',{version:1,priority:90,reason:'Synthetic owner decision'});
+  assert.equal(ready.status,200);
+  assert.deepEqual(history().map(({action,previous_priority,resulting_priority,task_version})=>[action,previous_priority,resulting_priority,task_version]),[
+    ['CAPTURED',null,10,1],['READY',10,90,2],['ACTIVE',90,90,3]
+  ]);
+  assert.equal(db.native.prepare('SELECT last_transition FROM command_tasks WHERE id=?').get(id).last_transition,history()[2].id);
+  const count=history().length;
+  assert.equal((await send(db,`/api/command-queue/${id}/ready`,'POST',{version:1,priority:5,reason:'Stale synthetic decision'})).status,409);
+  assert.equal(history().length,count);
+  assert.equal((await send(db,`/api/command-queue/${id}/finish`,'POST',{version:3,status:'BLOCKED',reason:'Synthetic blocker'})).status,200);
+  // A stale request in an eligible status must also leave both state and audit untouched.
+  assert.equal((await send(db,`/api/command-queue/${id}/ready`,'POST',{version:3,priority:5,reason:'Stale eligible decision'})).status,409);
+  assert.equal(history().length,count+1);
+  assert.equal((await send(db,`/api/command-queue/${id}/ready`,'POST',{version:4,reason:'Unchanged synthetic decision'})).status,200);
+  assert.deepEqual(history().slice(3).map(({action,previous_priority,resulting_priority,task_version})=>[action,previous_priority,resulting_priority,task_version]),[
+    ['BLOCKED',90,90,4],['READY',90,90,5],['ACTIVE',90,90,6]
+  ]);
+});
+
+test('failed READY audit or guarded update leaves rank, version and history unchanged',async()=>{
+  for(const failure of ['audit','update']){
+    const db=sqliteDB();
+    const a=await send(db,'/api/command-queue','POST',fixture('Synthetic atomic rank',10));
+    const id=a.body.id;
+    const before=db.native.prepare('SELECT * FROM command_tasks WHERE id=?').get(id);
+    const events=db.native.prepare('SELECT * FROM command_history').all();
+    db.native.exec(failure==='audit'
+      ? "CREATE TRIGGER fail_ready BEFORE INSERT ON command_history WHEN NEW.action='READY' BEGIN SELECT RAISE(ABORT,'synthetic audit failure'); END"
+      : "CREATE TRIGGER fail_ready BEFORE UPDATE ON command_tasks WHEN NEW.status='READY' BEGIN SELECT RAISE(ABORT,'synthetic update failure'); END");
+    assert.equal((await send(db,`/api/command-queue/${id}/ready`,'POST',{version:1,priority:90,reason:'Synthetic rollback'})).status,503);
+    assert.deepEqual(db.native.prepare('SELECT * FROM command_tasks WHERE id=?').get(id),before);
+    assert.deepEqual(db.native.prepare('SELECT * FROM command_history').all(),events);
+  }
+});
+
+test('additive audit migration preserves old history as unknown rather than inventing rank',()=>{
+  const native=new DatabaseSync(':memory:');
+  native.exec(readFileSync(new URL('../migrations/0006_command_queue.sql',import.meta.url),'utf8'));
+  native.exec("INSERT INTO command_tasks(id,title,outcome,why_now,done_when,source_kind,source_status,assignee) VALUES ('legacy-task','Synthetic legacy','Result','Why','Done','owner','owner_decision','human')");
+  native.exec("INSERT INTO command_history(id,task_id,action,reason) VALUES ('legacy','legacy-task','READY','Legacy synthetic decision')");
+  native.exec(readFileSync(new URL('../migrations/0007_command_priority_audit.sql',import.meta.url),'utf8'));
+  const row=native.prepare('SELECT * FROM command_history').get();
+  assert.equal(row.reason,'Legacy synthetic decision');
+  for(const key of ['previous_priority','resulting_priority','task_version'])assert.equal(row[key],null);
+  native.close();
 });

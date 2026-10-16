@@ -3,7 +3,7 @@
 ## Existing system, not another app
 This additive slice belongs to the existing authenticated `aios.soliwkr.pro` Worker and its private `LIFE_DB` D1. `Oggi` displays ONE human ACTIVE command before its existing rooms; no independent queue app, new provider, subscription, model invocation, or laptop runtime.
 
-- New additive migration: `migrations/0006_command_queue.sql`. Apply to **staging D1** and test there first. Do not run production migration until the release owner approves backup/rollback procedure; G0-B2 off-account backup remains HOLD.
+- New additive migrations: `migrations/0007_command_priority_audit.sql` follows `migrations/0006_command_queue.sql`. Apply to **staging D1** and test there first. Do not run production migration until the release owner approves backup/rollback procedure; G0-B2 off-account backup remains HOLD.
 - Source code and test fixtures contain no real personal tasks. The D1 tables `command_tasks` and append-only `command_history` retain private task content/evidence.
 - All routes remain behind existing verified owner-only Cloudflare Access. Writes additionally require same-origin `Origin`, `x-control-room: 1`, JSON content type, version checks and bounded request bodies.
 - SQLite partial unique index enforces at most one human `ACTIVE` entry globally. Atomic D1 `batch` writes and audit inserts guard each transition. Another READY task cannot silently preempt an existing ACTIVE task.
@@ -28,3 +28,6 @@ All writes require `Origin` matching the Worker origin, `x-control-room: 1` and 
 5. Document staging results, release SHA, snapshot/recovery and rollback; request human production GO. **Do not deploy automatically.**
 
 Success is not a mock UI with a green badge: production passes only when at least one genuine owner-approved task with defensible provenance survives refresh and progresses correctly with audit.
+
+## Priority decision provenance
+Capture retains initial priority (previous priority NULL). Each new transition records previous/resulting priority and resulting task version; history `id` equals the transition UUID. READY snapshots the eligible old row before its guarded update, inside one atomic D1 batch; stale decisions create no event. Promotion and finish retain unchanged rank. Migration 0007 leaves older events NULL because their original priorities cannot be reconstructed. Apply both migrations before this Worker version; test upgrade and rollback in an approved staging rehearsal. No live migration is authorized by this PR.

@@ -31,7 +31,7 @@ export async function promoteNext(db) {
   try {
     await db.batch([
       db.prepare("UPDATE command_tasks SET status='ACTIVE', version=version+1, updated_at=datetime('now'), last_transition=? WHERE id=(SELECT id FROM command_tasks WHERE assignee='human' AND status='READY' ORDER BY priority DESC,created_at ASC,id ASC LIMIT 1) AND NOT EXISTS (SELECT 1 FROM command_tasks WHERE assignee='human' AND status='ACTIVE')").bind(transition),
-      db.prepare("INSERT INTO command_history(id,task_id,action,reason,evidence) SELECT ?,id,'ACTIVE','Deterministic next READY task','' FROM command_tasks WHERE last_transition=?").bind(transition,transition)
+      db.prepare("INSERT INTO command_history(id,task_id,action,reason,evidence,previous_priority,resulting_priority,task_version) SELECT ?,id,'ACTIVE','Deterministic next READY task','',priority,priority,version FROM command_tasks WHERE last_transition=?").bind(transition,transition)
     ]);
   } catch (error) {
     // A simultaneous claimant may have won. The partial UNIQUE index is authoritative.
@@ -63,7 +63,7 @@ async function capture(db,data) {
   const id=crypto.randomUUID(),event=crypto.randomUUID();
   await db.batch([
     db.prepare("INSERT INTO command_tasks (id,title,outcome,why_now,done_when,source_kind,source_url,source_status,assignee,privacy_class,priority,review_at,last_transition) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,title,outcome,why,done,kind,source,sourceStatus,assignee,privacy,priority,review,event),
-    db.prepare("INSERT INTO command_history (id,task_id,action,reason) VALUES (?,?,'CAPTURED','Inbox: no automatic activation')").bind(event,id)
+    db.prepare("INSERT INTO command_history (id,task_id,action,reason,resulting_priority,task_version) VALUES (?,?,'CAPTURED','Inbox: no automatic activation',?,1)").bind(event,id,priority)
   ]);
   return reply({id,status:'CAPTURED',message:'Captured; direction decision required'},201);
 }
@@ -74,10 +74,13 @@ async function ready(db,id,data) {
   if(priority!==null&&(!Number.isInteger(priority)||priority<0||priority>100))
     return reply({error:'Invalid priority'},400);
   const event=crypto.randomUUID();
-  const ok=await batchTransition(db,
-    db.prepare("UPDATE command_tasks SET status='READY',priority=COALESCE(?,priority),version=version+1,updated_at=datetime('now'),last_transition=? WHERE id=? AND version=? AND status IN ('CAPTURED','BLOCKED','PARKED')").bind(priority,event,id,data.version),
-    db.prepare("INSERT INTO command_history(id,task_id,action,reason) SELECT ?,id,'READY',? FROM command_tasks WHERE last_transition=?").bind(event,trim(data.reason),event)
-  );
+  // Snapshot the guarded old row inside the same transaction, before overwriting rank.
+  // Both statements use the same eligibility guard; no request can interleave this batch.
+  const results=await db.batch([
+    db.prepare("INSERT INTO command_history(id,task_id,action,reason,previous_priority,resulting_priority,task_version) SELECT ?,id,'READY',?,priority,COALESCE(?,priority),version+1 FROM command_tasks WHERE id=? AND version=? AND status IN ('CAPTURED','BLOCKED','PARKED')").bind(event,trim(data.reason),priority,id,data.version),
+    db.prepare("UPDATE command_tasks SET status='READY',priority=COALESCE(?,priority),version=version+1,updated_at=datetime('now'),last_transition=? WHERE id=? AND version=? AND status IN ('CAPTURED','BLOCKED','PARKED')").bind(priority,event,id,data.version)
+  ]);
+  const ok=changed(results[1]);
   if(!ok)return reply({error:'Version conflict or transition disallowed'},409);
   return promoteAfterCommit(db,id,'READY');
 }
@@ -91,7 +94,7 @@ async function finish(db,id,data) {
   const event=crypto.randomUUID();
   const ok=await batchTransition(db,
     db.prepare("UPDATE command_tasks SET status=?,version=version+1,updated_at=datetime('now'),last_transition=? WHERE id=? AND version=? AND status='ACTIVE' AND assignee='human'").bind(status,event,id,data.version),
-    db.prepare("INSERT INTO command_history(id,task_id,action,reason,evidence) SELECT ?,id,?,?,? FROM command_tasks WHERE last_transition=?").bind(event,status,reason,evidence,event)
+    db.prepare("INSERT INTO command_history(id,task_id,action,reason,evidence,previous_priority,resulting_priority,task_version) SELECT ?,id,?,?,?,priority,priority,version FROM command_tasks WHERE last_transition=?").bind(event,status,reason,evidence,event)
   );
   if(!ok)return reply({error:'Version conflict or task not ACTIVE'},409);
   return promoteAfterCommit(db,id,status);
