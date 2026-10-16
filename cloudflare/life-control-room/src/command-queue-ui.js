@@ -14,6 +14,7 @@ const COMMAND_HTML = [
   '<div class="command-actions"><button type="button" class="command-primary" id="command-done">Concludi con evidenza ↗</button><button type="button" id="command-block-toggle">Sono bloccato</button></div>',
   '<div id="command-block-panel" hidden><label for="command-block-reason">Perché sei bloccato o vuoi mettere in pausa?</label><textarea id="command-block-reason" rows="2" maxlength="700"></textarea><div class="command-actions"><button type="button" id="command-block-submit">Registra blocco → prossimo NEXT</button><button type="button" id="command-park-submit">Metti in pausa con motivo</button></div></div>',
   '</div></div>',
+  '<button type="button" id="command-next" class="command-reload" hidden>Riprova prossimo NEXT</button>',
   '<p class="command-empty" id="command-empty" hidden>Nessuna assegnazione attiva. Non invento una priorità: la direzione deve approvare almeno un task READY. La cattura delle idee non ti assegna automaticamente altro lavoro.</p>',
   '<p class="command-failure" id="command-failure" hidden>Coda non verificabile: controllo migrazione D1, autenticazione o servizio. Nessun falso stato vuoto.</p>',
   '<div class="command-foot"><span id="command-count">In verifica</span><span>Un solo incarico umano. La delega agli agenti non è ancora attiva.</span></div>',
@@ -62,10 +63,11 @@ function installCommandQueue() {
   function render(data){
     current=data.active||null;
     toggle('command-current',!!current);
-    toggle('command-empty',!current);
+    toggle('command-empty',!current && !data.ready);
+    toggle('command-next',!current && data.ready>0);
     toggle('command-failure',false);
     label('command-count',(data.ready||0)+' in attesa · '+(data.captured||0)+' catturati · '+(data.blocked||0)+' bloccati');
-    if(!current){label('command-state','Nessun task attivo · direzione richiesta');return}
+    if(!current){label('command-state',data.ready?'Task READY disponibili · riprova prossimo NEXT':'Nessun task attivo · direzione richiesta');return}
     label('command-state','Unico incarico umano · versione '+current.version);
     label('command-title',current.title);
     label('command-why',current.why_now);
@@ -90,19 +92,23 @@ function installCommandQueue() {
     if(busy)return;
     busy=true;$('command-reload').disabled=true;
     try{render(await read())}
-    catch{current=null;toggle('command-current',false);toggle('command-empty',false);toggle('command-failure',true);label('command-state','Coda non verificabile');label('command-count','Servizio non verificabile')}
+    catch{current=null;toggle('command-current',false);toggle('command-empty',false);toggle('command-next',false);toggle('command-failure',true);label('command-state','Coda non verificabile');label('command-count','Servizio non verificabile')}
     finally{busy=false;$('command-reload').disabled=false}
   }
   async function post(url,payload){
     if(busy)return;
     busy=true;
-    for(var id of ['command-reload','command-done','command-block-submit','command-park-submit'])$(id).disabled=true;
+    for(var id of ['command-next','command-reload','command-done','command-block-submit','command-park-submit'])$(id).disabled=true;
     try{
       var response=await fetch(url,{method:'POST',headers:{'content-type':'application/json','x-control-room':'1'},body:JSON.stringify(payload)});
       if(!response.ok){var error=await response.json().catch(function(){return {error:'Request rejected'}});throw Error(error.error||'Errore')}
-      render(await response.json());
-    }catch(e){label('command-state','Non registrato: '+e.message+'. Ricarica per verificare.')}
-    finally{busy=false;for(var id of ['command-reload','command-done','command-block-submit','command-park-submit'])$(id).disabled=false}
+      var data=await response.json();
+      if(data.promotion_pending){
+        try{render(await read())}catch{current=null;toggle('command-current',false);toggle('command-empty',false);toggle('command-failure',true);toggle('command-next',true)}
+        label('command-state','Transizione '+data.transition.status+' registrata. Prossimo NEXT da verificare: riprova.');
+      }else{render(data)}
+    }catch(e){label('command-state','Esito da verificare: '+e.message+'. Ricarica per verificare.')}
+    finally{busy=false;for(var id of ['command-next','command-reload','command-done','command-block-submit','command-park-submit'])$(id).disabled=false}
   }
   function finish(status) {
     if(!current)return;
@@ -111,6 +117,7 @@ function installCommandQueue() {
     if(status!=='DONE'&&!reason){label('command-state','Descrivi il blocco o il motivo della pausa');return}
     post('/api/command-queue/'+encodeURIComponent(current.id)+'/finish',{version:current.version,status:status,evidence:evidence,reason:reason});
   }
+  $('command-next').addEventListener('click',function(){post('/api/command-queue/next',{})});
   $('command-done').addEventListener('click',function(){finish('DONE')});
   $('command-block-toggle').addEventListener('click',function(){toggle('command-block-panel',$('command-block-panel').hidden)});
   $('command-block-submit').addEventListener('click',function(){finish('BLOCKED')});

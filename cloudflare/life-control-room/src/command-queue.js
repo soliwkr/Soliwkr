@@ -40,6 +40,13 @@ export async function promoteNext(db) {
   }
   return readQueue(db);
 }
+async function promoteAfterCommit(db,id,status) {
+  try { return reply(await promoteNext(db)); }
+  catch {
+    // The preceding transition and its audit already committed. Never report it as lost.
+    return reply({transition:{id,status,committed:true},promotion_pending:true},202);
+  }
+}
 async function capture(db,data) {
   if(!data||typeof data!=='object'||Array.isArray(data))return reply({error:'Invalid task'},400);
   const title=trim(data.title),outcome=trim(data.outcome),why=trim(data.why_now),done=trim(data.done_when);
@@ -72,8 +79,7 @@ async function ready(db,id,data) {
     db.prepare("INSERT INTO command_history(id,task_id,action,reason) SELECT ?,id,'READY',? FROM command_tasks WHERE last_transition=?").bind(event,trim(data.reason),event)
   );
   if(!ok)return reply({error:'Version conflict or transition disallowed'},409);
-  const snapshot=await promoteNext(db);
-  return reply(snapshot);
+  return promoteAfterCommit(db,id,'READY');
 }
 async function finish(db,id,data) {
   const status=data?.status;
@@ -88,7 +94,7 @@ async function finish(db,id,data) {
     db.prepare("INSERT INTO command_history(id,task_id,action,reason,evidence) SELECT ?,id,?,?,? FROM command_tasks WHERE last_transition=?").bind(event,status,reason,evidence,event)
   );
   if(!ok)return reply({error:'Version conflict or task not ACTIVE'},409);
-  return reply(await promoteNext(db));
+  return promoteAfterCommit(db,id,status);
 }
 export async function commandQueueRequest(request,db,url) {
   try {

@@ -149,3 +149,31 @@ test('failed audit writes roll back intake and return sanitized 503 on every wri
     assert.deepEqual(response.body,{error:'Command queue storage unavailable'});
   }
 });
+
+test('committed READY and finish survive failed promotion and explicit next recovers once',async()=>{
+  for(const status of ['READY','DONE','BLOCKED','PARKED']){
+    const db=sqliteDB();
+    const a=await send(db,'/api/command-queue','POST',fixture('Synthetic A',20));
+    const b=await send(db,'/api/command-queue','POST',fixture('Synthetic B',10));
+    if(status!=='READY'){
+      await send(db,'/api/command-queue/'+a.body.id+'/ready','POST',{version:1,reason:'Synthetic direction'});
+      await send(db,'/api/command-queue/'+b.body.id+'/ready','POST',{version:1,reason:'Synthetic direction'});
+    }
+    db.native.exec("CREATE TRIGGER fail_promote BEFORE UPDATE ON command_tasks WHEN NEW.status='ACTIVE' BEGIN SELECT RAISE(ABORT,'synthetic promotion failure'); END");
+    const action=status==='READY'?'ready':'finish';
+    const result=await send(db,'/api/command-queue/'+a.body.id+'/'+action,'POST',
+      {version:status==='READY'?1:3,status,reason:'Synthetic rationale',evidence:'Synthetic evidence'});
+    assert.equal(result.status,202);
+    assert.deepEqual(result.body,{transition:{id:a.body.id,status,committed:true},promotion_pending:true});
+    assert.equal(db.native.prepare('SELECT status FROM command_tasks WHERE id=?').get(a.body.id).status,status);
+    assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_history WHERE task_id=? AND action=?').get(a.body.id,status).n,1);
+    db.native.exec('DROP TRIGGER fail_promote');
+    const snapshot=await send(db,'/api/command-queue');
+    assert.equal(snapshot.body.active,null);assert.equal(snapshot.body.ready,1);
+    const next=await send(db,'/api/command-queue/next','POST',{});
+    assert.equal(next.status,200);assert.equal(next.body.active.id,status==='READY'?a.body.id:b.body.id);
+    const count=db.native.prepare('SELECT count(*) AS n FROM command_history').get().n;
+    await send(db,'/api/command-queue/next','POST',{});
+    assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_history').get().n,count);
+  }
+});
