@@ -125,7 +125,7 @@
    });
  
 -  it("keeps Telegram start and unknown commands as terse guidance without creating work", async () => {
-+  it("keeps Telegram menu/start navigation and unknown commands without creating work", async () => {
++  it.each(["/menu", "/start"])("keeps Telegram menu/start navigation and unknown commands without creating work (%s)", async (command) => {
      const fixture = await seedCompany();
      const { callbacks, endpoint, runtime, service, wakeup } =
        await configuredTelegramEndpoint(fixture);
@@ -134,7 +134,7 @@
        });
      };
 -    await invoke("/start", "ignored payload", 501);
-+    await invoke("/menu", "", 501);
++    await invoke(command, "", 501);
      await invoke("/danger", "create an administrator action", 502);
  
      expect(
@@ -149,7 +149,7 @@
        ),
 --- /dev/null
 +++ b/server/src/services/chat-channels/telegram/menu.ts
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,90 @@
 +import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 +import { and, asc, eq, inArray } from "drizzle-orm";
 +import { agents, approvals, issues, projects, type Db } from "@paperclipai/db";
@@ -160,8 +160,13 @@
 +// secret, receiver, timer, cache, webhook or provider configuration is added.
 +const key = randomBytes(32);
 +const sections = ["home", "today", "decisions", "portfolio", "experiments", "agents", "economy", "alerts", "ceo"] as const;
-+const labels = ["Menu", "🎯 Oggi / ONE NEXT", "📥 Decisioni", "📁 Portafoglio", "🧪 Esperimenti", "🤖 Agenti", "💰 Economia", "🔔 Alert", "💬 Parla col CEO"];
++const labels = ["Menu", "🎯 Task aperte", "📥 Decisioni", "📁 Portafoglio", "🧪 Esperimenti", "🤖 Agenti", "💰 Economia", "🔔 Alert", "💬 Parla col CEO"];
 +const PAGE = 5;
++// Deployment-specific board origin, never derived from callback or database text.
++const BOARD = "https://hq.soliwkr.pro/SOL";
++const short = (value: string) => value.replace(/[\r\n\t]+/g, " ").slice(0, 100);
++const decisionLabel = (kind: string) => (({ hire_agent: "Assunzione agente", approve_ceo_strategy: "Strategia CEO" } as Record<string, string>)[kind] || short(kind.replaceAll("_", " ")));
++const boardLink = (kind: "issues" | "approvals", id: string) => `${BOARD}/${kind}/${encodeURIComponent(id)}`;
 +type Scope = { endpointId: string; userId: string; threadId: string };
 +export type MenuRoute = { section: string; page: number };
 +export type TelegramMenu = NonNullable<ChatPublicationProjectionInput["interaction"]>;
@@ -210,25 +215,25 @@
 +  } else if (route.section === "economy" || route.section === "experiments") {
 +    body += route.section === "economy" ? "NOT IMPLEMENTED — UNKNOWN: fonte economica proof-backed non collegata. Nessuna cifra stimata." : "NOT IMPLEMENTED — UNKNOWN: registro esperimenti BLACK OFFICE non collegato. Paperclip non sostituisce la fonte owner.";
 +  } else if (route.section === "portfolio") {
-+    const rows = await db.select({ id: projects.id, status: projects.status }).from(projects).where(eq(projects.companyId, companyId)).orderBy(asc(projects.id)).limit(PAGE + 1).offset(start);
++    const rows = await db.select({ id: projects.id, name: projects.name, status: projects.status }).from(projects).where(eq(projects.companyId, companyId)).orderBy(asc(projects.id)).limit(PAGE + 1).offset(start);
 +    hasNext = rows.length > PAGE;
-+    body += "Progetti Paperclip; verdict owner TENERE/CONGELARE/ARCHIVIARE/APERTI: NOT IMPLEMENTED. I nomi e i dettagli restano nella board protetta.\n";
-+    rows.slice(0, PAGE).forEach(row => { body += `${row.id}: ${row.status}\n`; add(`Progetto ${row.id.slice(0, 8)}`, `p${row.id.replaceAll("-", "")}`); });
++    body += "Progetti Paperclip; verdict owner TENERE/CONGELARE/ARCHIVIARE/APERTI: NOT IMPLEMENTED. Dettagli task nella navigazione; prove nella board protetta.\n";
++    rows.slice(0, PAGE).forEach(row => { body += `${short(row.name)} — ${row.status}\n`; add(short(row.name).slice(0, 40), `p${row.id.replaceAll("-", "")}`); });
 +    if (!rows.length) body += "Nessun progetto visibile.";
 +  } else if (route.section === "agents") {
-+    const rows = await db.select({ id: agents.id, status: agents.status }).from(agents).where(eq(agents.companyId, companyId)).orderBy(asc(agents.id)).limit(PAGE + 1).offset(start);
++    const rows = await db.select({ name: agents.name, status: agents.status }).from(agents).where(eq(agents.companyId, companyId)).orderBy(asc(agents.id)).limit(PAGE + 1).offset(start);
 +    hasNext = rows.length > PAGE;
-+    body += rows.slice(0, PAGE).map(row => `${row.id}: ${row.status}`).join("\n") || "Nessun agente.";
++    body += rows.slice(0, PAGE).map(row => `${short(row.name)} — ${row.status}`).join("\n") || "Nessun agente.";
 +  } else if (route.section === "decisions") {
-+    const rows = await db.select({ id: approvals.id, status: approvals.status }).from(approvals).where(and(eq(approvals.companyId, companyId), eq(approvals.status, "pending"))).orderBy(asc(approvals.id)).limit(PAGE + 1).offset(start);
++    const rows = await db.select({ id: approvals.id, type: approvals.type, status: approvals.status }).from(approvals).where(and(eq(approvals.companyId, companyId), eq(approvals.status, "pending"))).orderBy(asc(approvals.id)).limit(PAGE + 1).offset(start);
 +    hasNext = rows.length > PAGE;
-+    body += rows.slice(0, PAGE).map(row => `${row.id}: ${row.status}`).join("\n") || "Nessuna approvazione pending. Le questioni sulle task restano nelle conferme native.";
++    body += rows.slice(0, PAGE).map(row => `${decisionLabel(row.type)} — ${row.status}\n[Apri decisione protetta](${boardLink("approvals", row.id)})`).join("\n") || "Nessuna approvazione pending. Le questioni sulle task restano nelle conferme native.";
 +    body += "\nApri Paperclip per prove e decisioni protette. Questo menu non approva né rifiuta.";
 +  } else {
 +    const project = route.section.startsWith("p") && /^p[a-f0-9]{32}$/.test(route.section) ? route.section.slice(1).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5") : null;
-+    const rows = await db.select({ identifier: issues.identifier, status: issues.status }).from(issues).where(and(eq(issues.companyId, companyId), eq(issues.visibility, "open"), project ? eq(issues.projectId, project) : inArray(issues.status, route.section === "alerts" ? ["blocked"] : ["todo", "in_progress"]))).orderBy(asc(issues.id)).limit(PAGE + 1).offset(start);
++    const rows = await db.select({ identifier: issues.identifier, title: issues.title, status: issues.status }).from(issues).where(and(eq(issues.companyId, companyId), eq(issues.visibility, "open"), project ? eq(issues.projectId, project) : inArray(issues.status, route.section === "alerts" ? ["blocked"] : ["todo", "in_progress"]))).orderBy(asc(issues.id)).limit(PAGE + 1).offset(start);
 +    hasNext = rows.length > PAGE;
-+    body += "Metadati task aperte (non una priorità ONE NEXT approvata):\n" + (rows.slice(0, PAGE).map(row => `${row.identifier}: ${row.status}`).join("\n") || "Nessuna task.");
++    body += "Metadati task aperte (non una priorità ONE NEXT approvata):\n" + (rows.slice(0, PAGE).map(row => `${row.identifier || "Task"} — ${short(row.title)} — ${row.status}${row.identifier ? "\n[Apri task e prove](" + boardLink("issues", row.identifier) + ")" : ""}`).join("\n") || "Nessuna task.");
 +  }
 +  if (route.page > 0) add("◀ Pagina", route.section, route.page - 1);
 +  if (hasNext && route.page < 999) add("Pagina ▶", route.section, route.page + 1);
@@ -237,7 +242,7 @@
 +}
 --- /dev/null
 +++ b/server/src/__tests__/telegram-ceo-menu.test.ts
-@@ -0,0 +1,36 @@
+@@ -0,0 +1,61 @@
 +import { describe, it, expect } from "vitest";
 +import { menuRoute, menuToken, verifyMenuToken, readTelegramMenu, renderTelegramMenu } from "../services/chat-channels/telegram/menu.js";
 +const scope = { endpointId: "endpoint", userId: "owner", threadId: "telegram:owner" };
@@ -273,4 +278,29 @@
 +      expect(menu.card.actions!.map(a=>a.label)).toEqual(["↩ Indietro","🔄 Aggiorna"]);
 +    }
 +  });
++  it("shows names, short task titles and protected decision links without raw ID labels", async () => {
++    const id = "12345678-1234-1234-1234-123456789abc";
++    const fixture = (rows: object[]) => {
++      const query: any = {};
++      for (const step of ["from", "where", "orderBy", "limit"]) query[step] = () => query;
++      query.offset = async () => rows;
++      return { select: () => query } as never;
++    };
++    const project = await readTelegramMenu(fixture([{id, name:"RankEmpire", status:"in_progress"}]), "company", {section:"portfolio",page:0}, scope);
++    expect(project.card.body).toContain("RankEmpire — in_progress");
++    expect(project.card.actions![0].label).toBe("RankEmpire");
++    expect(project.card.body).not.toContain(id);
++    const agent = await readTelegramMenu(fixture([{name:"CEO",status:"idle"}]), "company", {section:"agents",page:0}, scope);
++    expect(agent.card.body).toContain("CEO — idle");
++    const task = await readTelegramMenu(fixture([{identifier:"SOL-34",title:"Verifica prove",status:"blocked"}]), "company", {section:"alerts",page:0}, scope);
++    expect(task.card.body).toContain("SOL-34 — Verifica prove — blocked");
++    expect(task.card.body).toContain("https://hq.soliwkr.pro/SOL/issues/SOL-34");
++    const decision = await readTelegramMenu(fixture([{id,type:"hire_agent",status:"pending"}]), "company", {section:"decisions",page:0}, scope);
++    expect(decision.card.body).toContain("Assunzione agente — pending");
++    expect(decision.card.body).toContain("https://hq.soliwkr.pro/SOL/approvals/" + id);
++    expect(renderTelegramMenu(decision)).toBeTruthy();
++    const home = await readTelegramMenu({} as never,"company",{section:"home",page:0},scope);
++    expect(home.card.actions![0].label).toBe("🎯 Task aperte");
++  });
++
 +});
