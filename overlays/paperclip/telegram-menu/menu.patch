@@ -1,0 +1,276 @@
+--- a/server/src/services/chat-channels.ts
++++ b/server/src/services/chat-channels.ts
+@@ -1,3 +1,4 @@
++import { menuRoute, readTelegramMenu, verifyMenuToken } from "./chat-channels/telegram/menu.js";
+ import { createChatSdkMessageReceiver } from "./chat-channels/runtime/sdk-messages.js";
+ import { admitDiscordSdkMessage } from "./chat-channels/discord/messages.js";
+ import { resolveInboundConversationBinding } from "./chat-channels/inbound/conversation-binding.js";
+@@ -1025,7 +1026,21 @@
+                   : undefined,
+               onAction:
+                 record.endpoint.capabilities.actions === true
+-                  ? (event) => handleAction(event, context)
++                  ? async (event) => {
++                      if (event.provider !== "telegram" || !event.event.actionId.startsWith("m.")) return handleAction(event, context);
++                      const record = await runtimeCallbackRecord(event.endpointId, context, ["active"]);
++                      if (!record) throw forbidden("Menu unavailable");
++                      const route = verifyMenuToken(event.event.actionId, { endpointId: event.endpointId, userId: event.event.user.userId, threadId: event.event.threadId });
++                      if (!route) throw forbidden("Menu expired or invalid; send /menu");
++                      const endpointRuntime = runtime.get(event.endpointId) ?? await runtimeFor(record.endpoint);
++                      const thread = endpointRuntime.thread(event.event.threadId);
++                      await handleSdkMessage({ endpointId: event.endpointId, provider: "telegram", thread, trigger: "direct_message", message: {
++                        id: `menu:${event.event.actionId}:${(event.event.raw as { id?: string })?.id ?? event.event.messageId}`,
++                        threadId: thread.id, text: `/menu ${route.section} ${route.page}`, raw: event.event.raw,
++                        author: event.event.user, metadata: { dateSent: new Date(), edited: false },
++                        formatted: { type: "root", children: [] }, attachments: [], links: [], isMention: false,
++                      } as unknown as Message }, context);
++                    }
+                   : undefined,
+               onModalSubmit:
+                 record.endpoint.capabilities.modals === true ||
+@@ -1868,6 +1883,12 @@
+       }
+ 
+       if (guidanceCommand) {
++        const navigation = menuRoute(message.text);
++        // Portfolio metadata requires an explicitly linked human in a private
++        // DM. Sponsored guests and groups retain ordinary command guidance.
++        const menu = navigation && thread.isDM && principalResolution.userId && !principalResolution.principal.isBot
++          ? await readTelegramMenu(db, endpoint.companyId, navigation, { endpointId: endpoint.id, userId: message.author.userId, threadId: thread.id })
++          : null;
+         const assignedAgentName =
+           guidanceCommand === "start"
+             ? await db
+@@ -1881,7 +1902,7 @@
+                 )
+                 .then((rows) => rows[0]?.name ?? "this agent")
+             : null;
+-        const responseText = telegramGuidanceResponse(guidanceCommand, endpoint.botUsername, assignedAgentName);
++        const responseText = menu?.card.body || telegramGuidanceResponse(guidanceCommand, endpoint.botUsername, assignedAgentName);
+         const publicationBinding =
+           existingConversation && existingIssue
+             ? { conversation: existingConversation, issue: existingIssue }
+@@ -1914,6 +1935,7 @@
+                 classification: "external",
+                 source: "task_control",
+                 text: responseText,
++                interaction: menu,
+               }),
+               principalId: principalResolution.principal.id,
+             });
+@@ -1938,6 +1960,7 @@
+                 effect: "thread_message",
+                 threadId: thread.id,
+                 text: responseText,
++                ...(menu ? { telegramMenu: menu } : {}),
+                 settleDelivery: true,
+                 resourceId: resource.id,
+               },
+--- a/server/src/services/chat-channels/telegram/commands.ts
++++ b/server/src/services/chat-channels/telegram/commands.ts
+@@ -28,7 +28,7 @@
+ 
+ export function telegramGuidanceCommand(
+   text: string,
+-): "start" | "task" | "unknown" | null {
++): "start" | "menu" | "task" | "unknown" | null {
+   const match = /^\/([a-z][\w-]*)(?:@[\w.-]+)?(?:\s|$)/i.exec(text.trim());
+   const command = match?.[1]?.toLowerCase();
+   if (
+@@ -39,6 +39,7 @@
+   )
+     return null;
+   if (command === "start") return "start";
++  if (command === "menu") return "menu";
+   if (command === "task") return "task";
+   return "unknown";
+ }
+@@ -75,7 +76,7 @@
+         // group. /task@bot <request> is therefore the provider-native root
+         // activation path; direct replies and later /task commands can
+         // continue the same active group/topic task.
+-        text: command === "/task" && text ? text : command,
++        text: command === "/task" && text ? text : command === "/menu" && text ? `${command} ${text}` : command,
+         formatted: { type: "root", children: [] },
+         raw: event.event.raw,
+         author: event.event.user,
+--- a/server/src/services/chat-channels/provider-effects.ts
++++ b/server/src/services/chat-channels/provider-effects.ts
+@@ -1,3 +1,4 @@
++import { renderTelegramMenu, type TelegramMenu } from "./telegram/menu.js";
+ import { createTelegramCallbackNoticeAuthority } from "./telegram/callback-notices.js";
+ 
+ import { slackThreadChannelId } from "./slack/messages.js";
+@@ -76,6 +77,7 @@
+   threadId: string;
+   userId?: string;
+   text: string;
++  telegramMenu?: TelegramMenu;
+   fallbackText?: string;
+   settleDelivery: boolean;
+   completeConversationId?: string;
+@@ -787,7 +789,7 @@
+                 });
+                 sent = { id: receipt.id, threadId: payload.threadId };
+               } else {
+-                sent = await target.post(payload.text);
++                sent = await target.post(claim.endpoint.provider === "telegram" && payload.telegramMenu ? renderTelegramMenu(payload.telegramMenu) : payload.text);
+               }
+             }
+             if (!sent) {
+--- a/server/src/__tests__/chat-channels.integration.test.ts
++++ b/server/src/__tests__/chat-channels.integration.test.ts
+@@ -54564,7 +54564,7 @@
+     });
+   });
+ 
+-  it("keeps Telegram start and unknown commands as terse guidance without creating work", async () => {
++  it("keeps Telegram menu/start navigation and unknown commands without creating work", async () => {
+     const fixture = await seedCompany();
+     const { callbacks, endpoint, runtime, service, wakeup } =
+       await configuredTelegramEndpoint(fixture);
+@@ -54607,15 +54607,13 @@
+         },
+       });
+     };
+-    await invoke("/start", "ignored payload", 501);
++    await invoke("/menu", "", 501);
+     await invoke("/danger", "create an administrator action", 502);
+ 
+     expect(
+       runtime.endpoints.get(endpoint.id)?.posts.map((post) => post.text),
+     ).toEqual([
+-      expect.stringMatching(
+-        /^Send a direct message to start work with Maya\. In a group, use \/task@paperclip_\d+_bot followed by your request\./,
+-      ),
++      expect.stringContaining("Navigazione in sola lettura"),
+       expect.stringMatching(
+         /^Available commands: \/task@paperclip_\d+_bot followed by your request, \/status, \/new, and \/close\.$/,
+       ),
+--- /dev/null
++++ b/server/src/services/chat-channels/telegram/menu.ts
+@@ -0,0 +1,85 @@
++import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
++import { and, asc, eq, inArray } from "drizzle-orm";
++import { agents, approvals, issues, projects, type Db } from "@paperclipai/db";
++import { Actions, Button, Card, CardText } from "chat";
++import { projectSafeChatPublication, type ChatPublicationProjectionInput } from "../../chat-publication-projection.js";
++
++// Process-local capability: restart invalidates old navigation. No persistent
++// secret, receiver, timer, cache, webhook or provider configuration is added.
++const key = randomBytes(32);
++const sections = ["home", "today", "decisions", "portfolio", "experiments", "agents", "economy", "alerts", "ceo"] as const;
++const labels = ["Menu", "🎯 Oggi / ONE NEXT", "📥 Decisioni", "📁 Portafoglio", "🧪 Esperimenti", "🤖 Agenti", "💰 Economia", "🔔 Alert", "💬 Parla col CEO"];
++const PAGE = 5;
++type Scope = { endpointId: string; userId: string; threadId: string };
++export type MenuRoute = { section: string; page: number };
++export type TelegramMenu = NonNullable<ChatPublicationProjectionInput["interaction"]>;
++const validSection = (s: string) => sections.includes(s as typeof sections[number]) || /^p[a-f0-9]{32}$/.test(s);
++export function menuRoute(text: string): MenuRoute | null {
++  const match = /^\/(?:menu|start)(?:@[\w.-]+)?(?:\s|$)/i.exec(text.trim());
++  if (!match) return null;
++  const [section = "home", rawPage = "0"] = text.trim().slice(match[0].length).trim().split(/\s+/);
++  const page = Number(rawPage);
++  return validSection(section) && Number.isInteger(page) && page >= 0 && page <= 999
++    ? { section, page } : { section: "home", page: 0 };
++}
++export function menuToken(route: MenuRoute, scope: Scope, now = Date.now()): string {
++  if (!validSection(route.section) || !Number.isInteger(route.page) || route.page < 0 || route.page > 999) throw new Error("Invalid menu route");
++  const data = `m.${route.section}.${route.page.toString(36)}.${(Math.floor(now / 1000) + 600).toString(36)}`;
++  const signature = createHmac("sha256", key).update(JSON.stringify([scope.endpointId, scope.userId, scope.threadId, data])).digest("base64url").slice(0, 14);
++  return `${data}.${signature}`;
++}
++export function verifyMenuToken(token: string, scope: Scope, now = Date.now()): MenuRoute | null {
++  if (token.length > 64) return null;
++  const match = /^m\.([a-z0-9]+)\.([0-9a-z]{1,2})\.([0-9a-z]{6,8})\.([A-Za-z0-9_-]{14})$/.exec(token);
++  if (!match || !validSection(match[1])) return null;
++  const page = parseInt(match[2], 36), expires = parseInt(match[3], 36);
++  const seconds = Math.floor(now / 1000);
++  if (page > 999 || expires <= seconds || expires > seconds + 600) return null;
++  const data = token.slice(0, token.lastIndexOf("."));
++  const expected = createHmac("sha256", key).update(JSON.stringify([scope.endpointId, scope.userId, scope.threadId, data])).digest("base64url").slice(0, 14);
++  return timingSafeEqual(Buffer.from(expected), Buffer.from(match[4])) ? { section: match[1], page } : null;
++}
++export function renderTelegramMenu(menu: TelegramMenu) {
++  const safe = projectSafeChatPublication({ classification: "external", source: "task_control", text: menu.card.body || menu.card.title, interaction: menu });
++  return Card({ title: safe.card!.title, children: [CardText(safe.card!.body || safe.text), ...(safe.card!.actions || []).map(action => Actions([action.type === "callback" ? Button({ id: action.actionId, label: action.label }) : (() => { throw new Error("Menu only supports navigation callbacks"); })()]))] });
++}
++export async function readTelegramMenu(db: Db, companyId: string, route: MenuRoute, scope: Scope): Promise<TelegramMenu> {
++  const actions: { type: "callback"; actionId: string; label: string }[] = [];
++  const add = (label: string, section: string, page = 0) => actions.push({ type: "callback", label, actionId: menuToken({ section, page }, scope) });
++  const name = labels[sections.indexOf(route.section as typeof sections[number])] || "Progetto";
++  let body = `SOLIWKR / ${name}\nFonte: Paperclip; lettura ${new Date().toISOString()}\n`;
++  let hasNext = false;
++  const start = route.page * PAGE;
++  if (route.section === "home") {
++    body += "Navigazione in sola lettura. Nessun tap concede un GO. Le conferme native restano separate.";
++    sections.slice(1).forEach((section, index) => add(labels[index + 1], section));
++  } else if (route.section === "ceo") {
++    body += "Scrivi un messaggio libero per parlare con il CEO. La chat e le conferme native continuano come prima.";
++  } else if (route.section === "economy" || route.section === "experiments") {
++    body += route.section === "economy" ? "NOT IMPLEMENTED — UNKNOWN: fonte economica proof-backed non collegata. Nessuna cifra stimata." : "NOT IMPLEMENTED — UNKNOWN: registro esperimenti BLACK OFFICE non collegato. Paperclip non sostituisce la fonte owner.";
++  } else if (route.section === "portfolio") {
++    const rows = await db.select({ id: projects.id, status: projects.status }).from(projects).where(eq(projects.companyId, companyId)).orderBy(asc(projects.id)).limit(PAGE + 1).offset(start);
++    hasNext = rows.length > PAGE;
++    body += "Progetti Paperclip; verdict owner TENERE/CONGELARE/ARCHIVIARE/APERTI: NOT IMPLEMENTED. I nomi e i dettagli restano nella board protetta.\n";
++    rows.slice(0, PAGE).forEach(row => { body += `${row.id}: ${row.status}\n`; add(`Progetto ${row.id.slice(0, 8)}`, `p${row.id.replaceAll("-", "")}`); });
++    if (!rows.length) body += "Nessun progetto visibile.";
++  } else if (route.section === "agents") {
++    const rows = await db.select({ id: agents.id, status: agents.status }).from(agents).where(eq(agents.companyId, companyId)).orderBy(asc(agents.id)).limit(PAGE + 1).offset(start);
++    hasNext = rows.length > PAGE;
++    body += rows.slice(0, PAGE).map(row => `${row.id}: ${row.status}`).join("\n") || "Nessun agente.";
++  } else if (route.section === "decisions") {
++    const rows = await db.select({ id: approvals.id, status: approvals.status }).from(approvals).where(and(eq(approvals.companyId, companyId), eq(approvals.status, "pending"))).orderBy(asc(approvals.id)).limit(PAGE + 1).offset(start);
++    hasNext = rows.length > PAGE;
++    body += rows.slice(0, PAGE).map(row => `${row.id}: ${row.status}`).join("\n") || "Nessuna approvazione pending. Le questioni sulle task restano nelle conferme native.";
++    body += "\nApri Paperclip per prove e decisioni protette. Questo menu non approva né rifiuta.";
++  } else {
++    const project = route.section.startsWith("p") && /^p[a-f0-9]{32}$/.test(route.section) ? route.section.slice(1).replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, "$1-$2-$3-$4-$5") : null;
++    const rows = await db.select({ identifier: issues.identifier, status: issues.status }).from(issues).where(and(eq(issues.companyId, companyId), eq(issues.visibility, "open"), project ? eq(issues.projectId, project) : inArray(issues.status, route.section === "alerts" ? ["blocked"] : ["todo", "in_progress"]))).orderBy(asc(issues.id)).limit(PAGE + 1).offset(start);
++    hasNext = rows.length > PAGE;
++    body += "Metadati task aperte (non una priorità ONE NEXT approvata):\n" + (rows.slice(0, PAGE).map(row => `${row.identifier}: ${row.status}`).join("\n") || "Nessuna task.");
++  }
++  if (route.page > 0) add("◀ Pagina", route.section, route.page - 1);
++  if (hasNext && route.page < 999) add("Pagina ▶", route.section, route.page + 1);
++  if (route.section !== "home") { add("↩ Indietro", route.section.startsWith("p") && route.section !== "portfolio" ? "portfolio" : "home"); add("🔄 Aggiorna", route.section, route.page); }
++  return { id: "telegram-menu", card: { kind: "status", title: name, body, actions } };
++}
+--- /dev/null
++++ b/server/src/__tests__/telegram-ceo-menu.test.ts
+@@ -0,0 +1,36 @@
++import { describe, it, expect } from "vitest";
++import { menuRoute, menuToken, verifyMenuToken, readTelegramMenu, renderTelegramMenu } from "../services/chat-channels/telegram/menu.js";
++const scope = { endpointId: "endpoint", userId: "owner", threadId: "telegram:owner" };
++describe("CEO read-only menu", () => {
++  it("reserves only menu/start and preserves free chat", () => {
++    expect(menuRoute("hello CEO")).toBeNull();
++    expect(menuRoute("/task build")).toBeNull();
++    expect(menuRoute("/start")).toEqual({section:"home",page:0});
++    expect(menuRoute("/menu portfolio 2")).toEqual({section:"portfolio",page:2});
++  });
++  it("rejects forged, expired and cross-principal capabilities", () => {
++    const now=1800000000000, token=menuToken({section:"portfolio",page:0},scope,now);
++    expect(verifyMenuToken(token,scope,now)).toEqual({section:"portfolio",page:0});
++    expect(verifyMenuToken(token,scope,now+600000)).toBeNull();
++    expect(verifyMenuToken(token.slice(0,-1)+"!",scope,now)).toBeNull();
++    for(const field of ["endpointId","userId","threadId"]) expect(verifyMenuToken(token,{...scope,[field]:"other"},now)).toBeNull();
++    expect(Buffer.byteLength(menuToken({section:"p"+"a".repeat(32),page:999},scope,now))).toBeLessThanOrEqual(64);
++  });
++  it("renders eight scoped navigation buttons without writes", async () => {
++    const db = new Proxy({}, {get(){throw new Error("Home must not access database");}}) as never;
++    const menu=await readTelegramMenu(db,"company",{section:"home",page:0},scope);
++    expect(menu.card.actions).toHaveLength(8);
++    for(const action of menu.card.actions!) {
++      expect(action.type).toBe("callback");
++      if(action.type==="callback") expect(verifyMenuToken(action.actionId,scope)).not.toBeNull();
++    }
++    expect(renderTelegramMenu(menu)).toBeTruthy();
++  });
++  it("marks missing owner sources explicitly", async () => {
++    for(const section of ["economy","experiments"]) {
++      const menu=await readTelegramMenu({} as never,"company",{section,page:0},scope);
++      expect(menu.card.body).toContain("NOT IMPLEMENTED");
++      expect(menu.card.actions!.map(a=>a.label)).toEqual(["↩ Indietro","🔄 Aggiorna"]);
++    }
++  });
++});
