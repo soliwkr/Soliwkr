@@ -1,0 +1,10 @@
+{
+  "repository": "paperclipai/paperclip",
+  "sha": "8f1cb11a034b82e93fa414f8e77beeb702cc14e8",
+  "sha256": {
+    "server/src/services/chat-channels.ts": "edefeced15fa3f456b1a60571098699f630e57412ab22c5f519f71fc9da1d311",
+    "server/src/services/chat-channels/telegram/commands.ts": "7b0a15fc9759fcd306e611f242947eb927bea70884d3e820f52a38fef8dc3d52",
+    "server/src/services/chat-channels/provider-effects.ts": "ce193b623dabcd48fea4cea6f4d86867dcaf8c1d6ad0f09a1944d3e201ac7b1d",
+    "server/src/__tests__/chat-channels.integration.test.ts": "1b6d8988aa400d052643919071f65ff86243e08f55d0f977fe1a097750f292d3"
+  }
+}
