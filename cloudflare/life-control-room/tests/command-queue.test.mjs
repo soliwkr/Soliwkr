@@ -22,6 +22,7 @@ function sqliteDB() {
   const native=new DatabaseSync(':memory:');
   native.exec(readFileSync(new URL('../migrations/0006_command_queue.sql',import.meta.url),'utf8'));
   native.exec(readFileSync(new URL('../migrations/0007_command_priority_audit.sql',import.meta.url),'utf8'));
+  native.exec(readFileSync(new URL('../migrations/0008_command_intake_receipts.sql',import.meta.url),'utf8'));
   const adapter={
     prepare(sql){
       let params=[];
@@ -231,4 +232,47 @@ test('additive audit migration preserves old history as unknown rather than inve
   assert.equal(row.reason,'Legacy synthetic decision');
   for(const key of ['previous_priority','resulting_priority','task_version'])assert.equal(row[key],null);
   native.close();
+});
+
+
+test('intake replay returns one task and one audit, including overlapping POSTs',async()=>{
+  const db=sqliteDB(),payload=fixture('Synthetic replay',10);
+  const a=await send(db,'/api/command-queue','POST',payload);
+  const b=await send(db,'/api/command-queue','POST',payload);
+  assert.equal(a.status,201); assert.equal(b.status,200);
+  assert.equal(b.body.id,a.body.id);
+  const results=await Promise.all(Array.from({length:6},()=>send(db,'/api/command-queue','POST',payload)));
+  for(const result of results){assert.equal(result.status,200);assert.equal(result.body.id,a.body.id);}
+  assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_tasks').get().n,1);
+  assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_history').get().n,1);
+  await send(db,'/api/command-queue/'+a.body.id+'/ready','POST',{version:1,reason:'Synthetic selection'});
+  const replay=await send(db,'/api/command-queue','POST',payload);
+  assert.equal(replay.body.id,a.body.id);assert.equal(replay.body.status,'ACTIVE');
+  assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_history').get().n,3);
+});
+
+
+test('intake identity scopes source and normalized payload without collapsing manual captures',async()=>{
+ const db=sqliteDB(),payload=fixture('Synthetic scoped intake',10);
+ const first=await send(db,'/api/command-queue','POST',payload);
+ const normalized=await send(db,'/api/command-queue','POST',{...payload,title:'  '+payload.title+'  '});
+ assert.equal(normalized.status,200);assert.equal(normalized.body.id,first.body.id);
+ for(const delta of [{source_url:'https://github.com/example/demo/issues/2'},{title:'Different obligation'},{assignee:'agent:qa'},{source_kind:'external'}]){
+  const result=await send(db,'/api/command-queue','POST',{...payload,...delta});
+  assert.equal(result.status,201);assert.notEqual(result.body.id,first.body.id);
+ }
+ const manual={...payload,source_kind:'owner',source_url:''};
+ const a=await send(db,'/api/command-queue','POST',manual),b=await send(db,'/api/command-queue','POST',manual);
+ assert.equal(a.status,201);assert.equal(b.status,201);assert.notEqual(a.body.id,b.body.id);
+});
+
+test('failed intake audit rolls back receipt so a retry can create exactly once',async()=>{
+ const db=sqliteDB(),payload=fixture('Synthetic receipt rollback',10);
+ db.native.exec("CREATE TRIGGER fail_receipt_audit BEFORE INSERT ON command_history BEGIN SELECT RAISE(ABORT,'synthetic'); END");
+ assert.equal((await send(db,'/api/command-queue','POST',payload)).status,503);
+ assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_intake_receipts').get().n,0);
+ db.native.exec('DROP TRIGGER fail_receipt_audit');
+ assert.equal((await send(db,'/api/command-queue','POST',payload)).status,201);
+ assert.equal((await send(db,'/api/command-queue','POST',payload)).status,200);
+ assert.equal(db.native.prepare('SELECT count(*) AS n FROM command_history').get().n,1);
 });

@@ -61,11 +61,20 @@ async function capture(db,data) {
     return reply({error:'Invalid task fields'},400);
   if(kind==='github'&&!source.startsWith('https://github.com/'))return reply({error:'GitHub provenance required'},400);
   const id=crypto.randomUUID(),event=crypto.randomUUID();
-  await db.batch([
-    db.prepare("INSERT INTO command_tasks (id,title,outcome,why_now,done_when,source_kind,source_url,source_status,assignee,privacy_class,priority,review_at,last_transition) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,title,outcome,why,done,kind,source,sourceStatus,assignee,privacy,priority,review,event),
-    db.prepare("INSERT INTO command_history (id,task_id,action,reason,resulting_priority,task_version) VALUES (?,?,'CAPTURED','Inbox: no automatic activation',?,1)").bind(event,id,priority)
+  // Stable normalized intake identity, not a source-wide uniqueness constraint.
+  // Unlinked manual captures remain distinct. No mutable task fields are used on replay.
+  const payload=JSON.stringify([kind,source,title,outcome,why,done,sourceStatus,assignee,privacy,priority,review]);
+  const digest=source ? await crypto.subtle.digest('SHA-256',new TextEncoder().encode(payload)) : null;
+  const key=digest ? Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('') : id;
+  const results=await db.batch([
+    db.prepare("INSERT INTO command_intake_receipts (intake_key,task_id) VALUES (?,?) ON CONFLICT(intake_key) DO NOTHING").bind(key,id),
+    db.prepare("INSERT INTO command_tasks (id,title,outcome,why_now,done_when,source_kind,source_url,source_status,assignee,privacy_class,priority,review_at,last_transition) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM command_intake_receipts WHERE intake_key=? AND task_id=?)").bind(id,title,outcome,why,done,kind,source,sourceStatus,assignee,privacy,priority,review,event,key,id),
+    db.prepare("INSERT INTO command_history (id,task_id,action,reason,resulting_priority,task_version) SELECT ?,?,'CAPTURED','Inbox: no automatic activation',?,1 WHERE EXISTS (SELECT 1 FROM command_tasks WHERE id=? AND last_transition=?)").bind(event,id,priority,id,event)
   ]);
-  return reply({id,status:'CAPTURED',message:'Captured; direction decision required'},201);
+  const task=await db.prepare("SELECT t.id,t.status FROM command_intake_receipts r JOIN command_tasks t ON t.id=r.task_id WHERE r.intake_key=?").bind(key).first();
+  if(!task)throw Error('Missing intake receipt');
+  const created=changed(results[0]);
+  return reply({...task,message:created?'Captured; direction decision required':'Intake replay; existing task retained'},created?201:200);
 }
 async function ready(db,id,data) {
   if(!Number.isInteger(data?.version)||data.version<1||!validText(data?.reason,700))
