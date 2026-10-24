@@ -24,18 +24,19 @@
 7. Alla chiusura, registrare link a PR/commit, test QA, eventuale deploy/rollback ed evidenza metrica. Non segnare `done` su un piano o su un codice non distribuito quando il risultato richiede funzionamento live.
 8. Nessun agente può produrre altre issue, assegnare nuovi agenti, spendere budget, avviare cron o aprire nuovi progetti per iniziativa propria.
 
-## Primo workstream autorizzato: Ristrutturazioni Formia
-- **Business owner:** RankEmpire Italia (autonomo rispetto a TROVATEMI) e repository `soliwkr/rankempire-italia`.
-- **Spec tecnica e sequenza RF-01..RF-10:** [strategia/RISTRUTTURAZIONI-FORMIA-DELIVERY.md](https://github.com/soliwkr/rankempire-italia/blob/ops/rf-one-queue-20261024/strategia/RISTRUTTURAZIONI-FORMIA-DELIVERY.md).
+## Primo pilota operativo: Ristrutturazioni Formia — modello nazionale CPL
+- **Business owner:** RankEmpire Italia (autonomo rispetto a TROVATEMI); repository `soliwkr/rankempire-italia`. **Nuovo mandato owner 24/10:** costruire *progressivamente* una rete nazionale di siti SEO su long tail non servite, monetizzando con publisher-network CPL. Nessun modello di vendita diretta alle imprese, nessuna raccolta di PII dei lead, nessuna assistenza ai clienti dell'impresa.
+- **Strategia proprietaria nazionale:** [CPL-NETWORK-ITALIA.md](https://github.com/soliwkr/rankempire-italia/blob/ops/rf-one-queue-20261024/strategia/CPL-NETWORK-ITALIA.md).
+- **Spec primo pilota e sequenza RF-01..RF-10:** [RISTRUTTURAZIONI-FORMIA-DELIVERY.md](https://github.com/soliwkr/rankempire-italia/blob/ops/rf-one-queue-20261024/strategia/RISTRUTTURAZIONI-FORMIA-DELIVERY.md).
 - **Sorgente preview v0.3:** [branch](https://github.com/soliwkr/rankempire-italia/tree/preview/ristrutturazioni-formia-v03/sites/ristrutturazioni-formia-v02).
 - **Prima azione SOLO READ-ONLY:** RF-01 verifica source/deploy/403, verifica GSC e URL pubblici, baseline e rischi. RF-02 preview esclusivamente dopo gate tecnico. `ristrutturazioniformia.it` produzione non si tocca.
-- **Evidenze precedenti da riusare:** [SOL-34](https://hq.soliwkr.pro/SOL/issues/SOL-34) DOI FAIL statico `/verify` vs `/api/leads/verify`, provenienza bundle live non verificata; [SOL-31](https://hq.soliwkr.pro/SOL/issues/SOL-31) audit/candidati preesistenti. Evitare duplicazioni.
-- **Dipendenze esterne:** link e condizioni Edilnet dall'owner; titolarità e informative legali da approvare; CMP iubenda **per il dominio Formia**; GTM/GA4 Formia separati da eSIM; Search Console test di readiness.
-- **Definizione di successo:** sito autorevole, UX/test e performance, URL e SEO controllati, privacy/consenso verificati, Edilnet attribuito e primo lead reale validato; nessuna promessa di ranking.
-- **Stop obbligatori:** niente modifica alla VPS, spese, ads, nuovi domini, pubblicazione autonoma, falsi contenuti, traffic/lead fake, merge di codice altrui, escalation non autorizzate.
+- **Evidenze precedenti da riusare:** [SOL-34](https://hq.soliwkr.pro/SOL/issues/SOL-34) DOI FAIL statico `/verify` vs `/api/leads/verify` **solo per il modello storico di raccolta diretta dei lead**, non prerequisito nel funnel CPL referral; [SOL-31](https://hq.soliwkr.pro/SOL/issues/SOL-31). Evitare duplicazioni.
+- **Dipendenze esterne:** idoneità di almeno un network CPL publisher al verticale/traffico SEO e al territorio; Edilnet è soltanto benchmark e il suo funnel è a conversione sconosciuta; titolarità e informative legali, CMP iubenda **per dominio Formia**, GTM/GA4 Formia separati da eSIM, test GSC.
+- **Definizione di successo del pilota:** sito autorevole, UX/test e performance, URL e SEO controllati, privacy/consenso verificati, conversione partner CPL attribuita e almeno un lead reale approvato/remunerato; economics verificati prima della replica nazionale. **Nessun cliente/renter da acquisire** e nessuna promessa di ranking.
+- **Stop obbligatori per il ciclo attuale:** niente modifica alla VPS, spese, ads, nuovi domini/deploy finché non approvati, pubblicazione autonoma, falsi contenuti, traffic/lead fake, CRM/lead PII proprietari, outreach a imprese, merge non autorizzati, escalation. **I futuri siti nazionali fanno parte della strategia**, non di un GO esecutivo indiscriminato.
 
 ## Routine minima del CEO
 Quando riceve un aggiornamento: rileggere issue PaperClip e spec repo, controllare l'unico work item attivo, fare check evidenza/CI/Cloudflare, aggiornare una sola issue con “fatto/provato, blocco, prossimo passo”. Portare all'owner soltanto i veri gate o dipendenze; non creare report cron duplicati o promettere lavoro continuo se l'agente non è effettivamente schedulato.
 
 ## Estensione ad altri progetti
-Questa è una **regola generale di intake**, non un GO ai progetti congelati o fuori roadmap. È già presente PaperClip per il portfolio. Prima di inserire nuovi workstream si riconciliano la coda preesistente e i verdetti più recenti, senza reimportare tutta la cronologia come lavoro attivo.
+Questa è una **regola generale di intake**, non un GO ai progetti congelati o fuori roadmap. Per RankEmpire, **il gate di scala ora dipende dalla validazione del CPL publisher e non dal primo renter pagante**. È già presente PaperClip per il portfolio. Prima di inserire nuovi workstream si riconciliano la coda preesistente e i verdetti più recenti, senza reimportare tutta la cronologia come lavoro attivo.
