@@ -4,6 +4,8 @@
 **Responsabile del coordinamento:** CEO — SOLIWKR (PaperClip agent già esistente)  
 **Coda operativa canonica:** [PaperClipHQ / SOLIWKR Pro — issue SOL](https://hq.soliwkr.pro/SOL/issues). Questa pagina **non è una seconda coda**: definisce ingressi, regole e routing.
 
+**Issue attualmente coordinata:** [SOL-43 — Ristrutturazioni Formia](https://hq.soliwkr.pro/SOL/issues/SOL-43). Nessuna seconda issue è autorizzata per la stessa delivery.
+
 ## Principio
 **Una sola vista delle azioni vive; le fonti proprietarie restano separate.**
 - Le **issue PaperClip SOL** registrano assegnatario, priorità, stato, blocker, approvazioni e link alle prove. Issue e aggiornamenti vivono unicamente lì.
