@@ -29,7 +29,7 @@ async function scoutFallbackDex(env){
       if(mintSet.size>=30)break;
     }
   }
-  if(!mintSet.size)throw Error('FALLBACK_NO_DISCOVERY_DATA');
+  if(!mintSet.size){await event(env,'Scout','BACKUP_EMPTY',null,null,'DexScreener backup empty; no exhaustive discovery');return [];}
   const pairs=await readJson('https://api.dexscreener.com/tokens/v1/solana/'+[...mintSet].join(','));
   if(!Array.isArray(pairs))throw Error('FALLBACK_PAIRS_INVALID');
   const recent=Date.now()-30*60*1000;const found=new Map();
@@ -56,9 +56,9 @@ async function scout(env){
       const a=x.attributes||{};
       pools.push({pool,mint,symbol:String(a.name||mint.slice(0,6)).slice(0,45),dex,created:a.pool_created_at||null,volume:fin(a.volume_usd?.h1),price:fin(QUOTE.has(base)?a.quote_token_price_usd:a.base_token_price_usd)});
     }
-    await event(env,'Scout','SOURCE',null,null,'GeckoTerminal new pools feed operational',{matched:pools.length});
+    await env.DB.prepare("UPDATE state SET feed_health='SOURCE_UP',last_feed_ok=?,last_error=NULL WHERE id=1").bind(now()).run();await event(env,'Scout','SOURCE',null,null,'GeckoTerminal new pools feed operational',{matched:pools.length});
   }catch(e){
-    await event(env,'Scout','SOURCE_FALLBACK',null,null,'GeckoTerminal unavailable: '+qs(e.message)+'; using limited DexScreener backup');
+    await env.DB.prepare("UPDATE state SET feed_health='DEGRADED',last_error=? WHERE id=1").bind(qs(e.message)).run();await event(env,'Scout','SOURCE_FALLBACK',null,null,'GeckoTerminal unavailable: '+qs(e.message)+'; using limited DexScreener backup');
     pools=await scoutFallbackDex(env);
   }
   await event(env,'Scout','DISCOVER',null,null,'Found '+pools.length+' Raydium/PumpSwap pools in current feed',{count:pools.length});
