@@ -330,19 +330,19 @@ async function onchainProbe(env){
 // Separate sample of a recently discovered PumpSwap candidate, still read-only.
 async function onchainCandidateProbe(env){
  try{
-  const already=await first(env,'SELECT id FROM onchain_quote_probes WHERE id=3');
+  const already=await first(env,'SELECT id FROM onchain_quote_probes WHERE id=4');
   if(already)return;
   const c=await first(env,"SELECT pool,mint FROM candidates WHERE lower(dex)='pumpswap' AND LENGTH(mint)>=32 ORDER BY seen_at DESC LIMIT 1");
   if(!c)return;
-  const inserted=await env.DB.prepare('INSERT OR IGNORE INTO onchain_quote_probes(id,ts,pool,mint,status,evidence) VALUES(3,?,?,?,?,?)')
+  const inserted=await env.DB.prepare('INSERT OR IGNORE INTO onchain_quote_probes(id,ts,pool,mint,status,evidence) VALUES(4,?,?,?,?,?)')
    .bind(now(),c.pool,c.mint,'RUNNING','Read-only new-pool spot probe').run();
   if((inserted.meta?.changes||0)!==1)return;
   try{
    const result=await inspectPumpSwapPool((method,params)=>heliusRpc(env,method,params),c.pool,c.mint);
-   await env.DB.prepare("UPDATE onchain_quote_probes SET ts=?,status='PASS',evidence=? WHERE id=3")
+   await env.DB.prepare("UPDATE onchain_quote_probes SET ts=?,status='PASS',evidence=? WHERE id=4")
     .bind(now(),JSON.stringify(result)).run();
   }catch(e){
-   await env.DB.prepare("UPDATE onchain_quote_probes SET ts=?,status='FAIL',evidence=? WHERE id=3")
+   await env.DB.prepare("UPDATE onchain_quote_probes SET ts=?,status='FAIL',evidence=? WHERE id=4")
     .bind(now(),String(e.message||e).slice(0,600)).run();
   }
  }catch(e){return}
