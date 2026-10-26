@@ -352,11 +352,11 @@ async function onchainCandidateProbe(env){
 // Single bounded on-chain market-quality probe. Strictly separate from trading.
 async function onchainMarketProof(env){
  try{
-  const existing=await first(env,'SELECT id FROM onchain_market_probes WHERE id=2');
+  const existing=await first(env,'SELECT id FROM onchain_market_probes WHERE id=3');
   if(existing)return;
   const candidate=await first(env,"SELECT pool,mint FROM onchain_quote_probes WHERE id=4 AND status='PASS'");
   if(!candidate)return;
-  const x=await env.DB.prepare('INSERT OR IGNORE INTO onchain_market_probes(id,ts,pool,mint,status,evidence) VALUES(2,?,?,?,?,?)')
+  const x=await env.DB.prepare('INSERT OR IGNORE INTO onchain_market_probes(id,ts,pool,mint,status,evidence) VALUES(3,?,?,?,?,?)')
    .bind(now(),candidate.pool,candidate.mint,'RUNNING','{}').run();
   if((x.meta?.changes||0)!==1)return;
   const rpc=(method,params)=>heliusRpc(env,method,params);
@@ -375,11 +375,11 @@ async function onchainMarketProof(env){
    measures.fees=fees.status==='fulfilled'?fees.value:{verified:false,error:qs(fees.reason?.message)};
    measures.extensions=extensions.status==='fulfilled'?extensions.value:{audited:false,error:qs(extensions.reason?.message)};
    measures.hourlyTurnover=volume.status==='fulfilled'?volume.value:{verified:false,error:qs(volume.reason?.message),usableForHardVolumeGate:false};
-   await env.DB.prepare("UPDATE onchain_market_probes SET ts=?,status='MEASURED_INCOMPLETE',evidence=? WHERE id=2")
+   await env.DB.prepare("UPDATE onchain_market_probes SET ts=?,status='MEASURED_INCOMPLETE',evidence=? WHERE id=3")
     .bind(now(),JSON.stringify(measures)).run();
   }catch(e){
    measures.fatal=qs(e.message);
-   await env.DB.prepare("UPDATE onchain_market_probes SET ts=?,status='FAIL',evidence=? WHERE id=2")
+   await env.DB.prepare("UPDATE onchain_market_probes SET ts=?,status='FAIL',evidence=? WHERE id=3")
     .bind(now(),JSON.stringify(measures)).run();
   }
  }catch(e){return}
