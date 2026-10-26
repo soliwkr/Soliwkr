@@ -90,12 +90,16 @@ export async function inspectPumpSwapPool(rpc,poolAddress,expectedBaseMint){
  const [baseVault,quoteVault,baseMint,quoteMint]=records;
  // Strictly verify the two vault owners, vault account token mints and the SPL program.
  const SPL='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
- if(baseVault.owner!==SPL||quoteVault.owner!==SPL||baseMint.owner!==SPL||quoteMint.owner!==SPL)throw Error('TOKEN_PROGRAM_UNSUPPORTED');
+ const T22='TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+ const allowed=new Set([SPL,T22]);
+ const baseProgram=baseMint.owner,quoteProgram=quoteMint.owner;
+ if(!allowed.has(baseProgram)||!allowed.has(quoteProgram)||baseVault.owner!==baseProgram||quoteVault.owner!==quoteProgram)throw Error('TOKEN_PROGRAM_UNSUPPORTED_OR_VAULT_MISMATCH');
  const baseToken=parseTokenAccount(byteData(baseVault)),quoteToken=parseTokenAccount(byteData(quoteVault));
  if(baseToken.owner!==poolAddress||quoteToken.owner!==poolAddress||baseToken.mint!==pool.baseMint||quoteToken.mint!==pool.quoteMint)throw Error('VAULT_ADDRESS_OR_MINT_PROOF_FAILED');
  const baseDecimals=parseMintDecimals(byteData(baseMint)),quoteDecimals=parseMintDecimals(byteData(quoteMint));
  const price=quoteFromReserves({baseRaw:baseToken.amount,quoteRaw:quoteToken.amount,virtualQuote:pool.virtualQuote,baseDecimals,quoteDecimals});
  return {pool:poolAddress,mint:expectedBaseMint,quoteMint:pool.quoteMint,baseDecimals,quoteDecimals,
-  ...price,slot:response?.result?.context?.slot||null,
-  source:'HELIUS_PUMPSWAP_POOL_ACCOUNTS',status:'ONCHAIN_SPOT_ONLY_VOLUME_UNKNOWN',mode:'READ_ONLY_PAPER_RESEARCH'};
+  ...price,slot:response?.result?.context?.slot||null,baseTokenProgram:baseProgram,quoteTokenProgram:quoteProgram,
+  extensionsAudited:baseProgram===SPL&&quoteProgram===SPL,
+  source:'HELIUS_PUMPSWAP_POOL_ACCOUNTS',status:(baseProgram===SPL&&quoteProgram===SPL)?'ONCHAIN_SPOT_ONLY_VOLUME_UNKNOWN':'TOKEN_2022_EXTENSIONS_UNAUDITED_NOT_EXECUTABLE',mode:'READ_ONLY_PAPER_RESEARCH'};
 }
