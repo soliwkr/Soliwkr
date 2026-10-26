@@ -54,7 +54,7 @@ export async function boundedOneHourTurnover(rpc,proof,{nowSeconds=Math.floor(Da
  if(!coverage.complete)return {verified:false,reason:coverage.reason,knownTransactions:coverage.knownTransactions,windowStart:coverage.windowStart,volumeNative:null,swaps:0,rpcTxBudget:maxTransactions};
  let total=0n,swaps=0,unknown=0;
  for(const sig of coverage.selection){
-  const tx=(await rpc('getTransaction',[sig.signature,{encoding:'jsonParsed',commitment:'confirmed',maxSupportedTransactionVersion:0}]))?.result;
+  const tx=(await rpc('getTransaction',[sig.signature,{encoding:'jsonParsed',commitment:'confirmed',maxSupportedTransactionVersion:1}]))?.result;
   if(!tx||!Number.isInteger(tx.blockTime)||tx.blockTime<coverage.windowStart){unknown++;continue}
   try{
    const x=swapQuoteDelta(tx,proof);
