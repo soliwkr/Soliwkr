@@ -28,3 +28,12 @@ Official sample pool probe id=1 failed due manual sample-mint typo; id=2 correct
 - Base mint is **Token-2022**, quote mint is classic SPL WSOL. Program owner matching passed. Extension features and transfer fee/scale are not audited: status `TOKEN_2022_EXTENSIONS_UNAUDITED_NOT_EXECUTABLE`.
 - Code remains read-only. No input to the existing trading engine was changed. Important remaining gaps: independent 1h swap volume, quote currency USD conversion, pool-specific fee/slippage model, and Token-2022 extensions.
 - Initial sample mint transcription error and first strict Token-2022 rejection remain preserved as FAIL records alongside corrected PASS records in the D1 probe table.
+
+## On-chain market quality pilot (26 October 2026)
+- Added `pumpswap-volume.mjs` + fixtures: bounded historical swap-volume attempt via Solana `getSignaturesForAddress` and `getTransaction`, checking buy/sell logs, same-pool vault balances and signs, explicit 60m completeness and a 6-transaction RPC credit budget.
+- Volume represents approximate *quote-vault turnover*, not proof of swap payment after token transfer fees. `usableForHardVolumeGate=false` even for fully scanned snapshots; no threshold is silently relaxed.
+- Added `pumpswap-quality.mjs`: Helius WSOL/USD indicative quote (public CoinGecko fallback), live PumpSwap global fee minimum (LP + protocol only), and conservative Token-2022 mint extension inventory. No exit or entry gate changes.
+- 2026-10-26 20:36:23 UTC, probe 1: live on-chain pool spot ~0.000000024710921618 SOL/token; Helius WSOL/USD 100.15776; implied *indicative* USD spot 0.0000024749905567944556; LP 20bps + protocol 5bps. Token-2022 mint extensions were metadataPointer and tokenMetadata, not transferFeeConfig; executable fill still unverified.
+- Probe 1 historical RPC failed with `HELIUS_RPC_ERROR_-32015`: a Solana transaction v1 reached a request using `maxSupportedTransactionVersion:0`. Fixed request to support version 1 and scheduled a separate immutable probe 2. Solana transaction v1 live since September 15, 2026.
+- Requires independent provider comparison and full-hour trade indexing before using any volume for $40k/h hard gate. Higher-activity pools will exceed the small bounded RPC budget and must remain unverified; efficient solution likely event indexer/streamer, subject to budget and user permission.
+- All work is paper-only. Existing cloud Worker continues 1-min cron, $1000 fictitious book, with no wallet and zero live trading.
