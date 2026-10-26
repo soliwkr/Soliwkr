@@ -37,3 +37,10 @@ Official sample pool probe id=1 failed due manual sample-mint typo; id=2 correct
 - Probe 1 historical RPC failed with `HELIUS_RPC_ERROR_-32015`: a Solana transaction v1 reached a request using `maxSupportedTransactionVersion:0`. Fixed request to support version 1 and scheduled a separate immutable probe 2. Solana transaction v1 live since September 15, 2026.
 - Requires independent provider comparison and full-hour trade indexing before using any volume for $40k/h hard gate. Higher-activity pools will exceed the small bounded RPC budget and must remain unverified; efficient solution likely event indexer/streamer, subject to budget and user permission.
 - All work is paper-only. Existing cloud Worker continues 1-min cron, $1000 fictitious book, with no wallet and zero live trading.
+
+## Verified first on-chain hour-window retrieval (26 October 20:38 UTC)
+- Root cause of `-32015`: `getTransaction` used `maxSupportedTransactionVersion:0`; Solana mainnet transaction v1 requires `1`. This was corrected and confirmed on Helius.
+- Probe 2 at 20:38:23 UTC: 2 historical transaction signatures in the 60-minute window, 1 PumpSwap buy/sell-like vault movement, `0.021701475 SOL` quote-vault turnover. This is only a **vault-delta approximation**, not an exact trade-volume certification or USD history.
+- On-chain fee configuration: LP 20 bps and protocol 5 bps; dynamic creator fees remain unverified. WSOL/USD via Helius DAS 100.15268 at observation; it is not a historical FX series.
+- The official PumpSwap IDL exposes BuyEvent / SellEvent quote amounts and fee fields, with Anchor event discriminators `[103,244,82,31,44,245,119,119]` and `[62,47,55,10,165,3,220,42]`. New parser extracts quote amounts and checks the source pool; probe 3 records its one-off validation without permitting trades.
+- A full-hour volume threshold for trading requires complete historical coverage and a defensible USD conversion; the bounded probe intentionally cannot validate busy pools needing >6 individual transaction reads. Do not enable the $40k/h gate from the probe's estimates.
