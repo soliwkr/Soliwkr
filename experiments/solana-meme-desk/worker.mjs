@@ -65,6 +65,29 @@ async function scout(env){
   return pools;
 }
 async function market(env,c){const pairs=await readJson('https://api.dexscreener.com/token-pairs/v1/solana/'+encodeURIComponent(c.mint));if(!Array.isArray(pairs))throw Error('DEX_PAIRS_INVALID');const p=pairs.find(p=>p.pairAddress===c.pool&&p.chainId==='solana');if(!p)throw Error('EXACT_POOL_NOT_LISTED');if(p.baseToken?.address!==c.mint)throw Error('BASE_ASSET_PRICE_AMBIGUOUS');return {price:fin(p.priceUsd),volume:fin(p.volume?.h1),liquidity:fin(p.liquidity?.usd),pair:p,dex:p.dexId};}
+async function markForRisk(env,c){
+  let errors=[];
+  try{return {...await market(env,c),source:'DEXSCREENER_EXACT_POOL'}}catch(e){errors.push('DEX:'+qs(e.message))}
+  try{
+    const r=await readJson('https://api.geckoterminal.com/api/v2/networks/solana/pools/'+encodeURIComponent(c.pool));
+    const base=String(r?.data?.relationships?.base_token?.data?.id||'').replace(/^solana_/,'');
+    const quote=String(r?.data?.relationships?.quote_token?.data?.id||'').replace(/^solana_/,'');
+    const a=r?.data?.attributes||{};
+    if(base!==c.mint&&quote!==c.mint)throw Error('GECKO_MINT_PAIR_MISMATCH');
+    const price=fin(base===c.mint?a.base_token_price_usd:a.quote_token_price_usd);
+    if(!Number.isFinite(price)||price<=0)throw Error('GECKO_NO_VERIFIABLE_PRICE');
+    await event(env,'Risk','PRICE_FALLBACK',c.mint,c.symbol,'GeckoTerminal exact-pool price, DexScreener unavailable',{errors});
+    return {price,source:'GECKOTERMINAL_EXACT_POOL'};
+  }catch(e){errors.push('GECKO:'+qs(e.message))}
+  try{
+    const r=await readJson('https://api.jup.ag/price/v3?ids='+encodeURIComponent(c.mint));
+    const price=fin(r?.[c.mint]?.usdPrice);
+    if(!Number.isFinite(price)||price<=0)throw Error('JUPITER_PRICE_MISSING_OR_KEY_REQUIRED');
+    await event(env,'Risk','PRICE_FALLBACK',c.mint,c.symbol,'Jupiter aggregate mint price; NOT exact-pool execution quote',{errors});
+    return {price,source:'JUPITER_AGGREGATE_INDICATIVE'};
+  }catch(e){errors.push('JUPITER:'+qs(e.message))}
+  throw Error('ALL_RISK_PRICE_FEEDS_FAILED: '+errors.map(qs).join(' | ').slice(0,320));
+}
 async function heliusRpc(env,method,params){
  if(!env.HELIUS_API_KEY)throw Error('HELIUS_SECRET_NOT_CONFIGURED');
  const r=await readJson('https://mainnet.helius-rpc.com/?api-key='+encodeURIComponent(env.HELIUS_API_KEY),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})});
@@ -90,7 +113,7 @@ const units=size/(mkt.price*(1+CFG.entryFriction));const ts=now();await env.DB.b
  env.DB.prepare('INSERT INTO positions(mint,pool,symbol,units,entry,peak,cost,opened_at,mark,quote_ts) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(c.mint,c.pool,c.symbol,units,mkt.price,mkt.price,size,ts,mkt.price,ts),
  env.DB.prepare('INSERT INTO trades(ts,mint,symbol,side,price,units,gross,net,reason,evidence,realized_pnl) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(ts,c.mint,c.symbol,'BUY',mkt.price,units,size,size,'ALL_FILTERS_PASS + ANALYST_PASS + RISK_AUTHORIZED',JSON.stringify({proof,analysis,slippage:CFG.entryFriction}),null)
 ]);await event(env,'Executor','BUY',c.mint,c.symbol,'Paper entry '+size.toFixed(2)+' USD; all gates passed',{proof,analysis})}
-async function risk(env){const p=(await sql(env,'SELECT * FROM positions')).results||[];let failures=[];for(const pos of p){try{const m=await market(env,pos);if(!Number.isFinite(m.price)||m.price<=0)throw Error('POSITION_MARK_UNAVAILABLE');const peak=Math.max(m.price,Number(pos.peak));const trailing=peak>=Number(pos.entry)*(1+CFG.trailActivation);const stop=trailing?Math.max(Number(pos.entry)*(1-CFG.stopLoss),peak*(1-CFG.trailingGap)):Number(pos.entry)*(1-CFG.stopLoss);const ts=now();await env.DB.prepare('UPDATE positions SET peak=?,mark=?,quote_ts=? WHERE mint=?').bind(peak,m.price,ts,pos.mint).run();if(m.price>stop)continue;const realized=pos.units*m.price*(1-CFG.exitFriction);const pnl=realized-Number(pos.cost);const why=trailing?'TRAILING_8PCT_FROM_PEAK_AFTER_15PCT_GAIN':'STOP_LOSS_8PCT_TRIGGER';await env.DB.batch([
+async function risk(env){const p=(await sql(env,'SELECT * FROM positions')).results||[];let failures=[];for(const pos of p){try{const m=await markForRisk(env,pos);if(!Number.isFinite(m.price)||m.price<=0)throw Error('POSITION_MARK_UNAVAILABLE');const peak=Math.max(m.price,Number(pos.peak));const trailing=peak>=Number(pos.entry)*(1+CFG.trailActivation);const stop=trailing?Math.max(Number(pos.entry)*(1-CFG.stopLoss),peak*(1-CFG.trailingGap)):Number(pos.entry)*(1-CFG.stopLoss);const ts=now();await env.DB.prepare('UPDATE positions SET peak=?,mark=?,quote_ts=? WHERE mint=?').bind(peak,m.price,ts,pos.mint).run();if(m.price>stop)continue;const realized=pos.units*m.price*(1-CFG.exitFriction);const pnl=realized-Number(pos.cost);const why=trailing?'TRAILING_8PCT_FROM_PEAK_AFTER_15PCT_GAIN':'STOP_LOSS_8PCT_TRIGGER';await env.DB.batch([
  env.DB.prepare('UPDATE state SET cash=cash+? WHERE id=1').bind(realized),
  env.DB.prepare('DELETE FROM positions WHERE mint=?').bind(pos.mint),
  env.DB.prepare('INSERT INTO trades(ts,mint,symbol,side,price,units,gross,net,reason,evidence,realized_pnl) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(ts,pos.mint,pos.symbol,'SELL',m.price,pos.units,pos.units*m.price,realized,why,JSON.stringify({entry:pos.entry,stop,peak,slippage:CFG.exitFriction}),pnl)
