@@ -42,7 +42,8 @@ export function parsePumpSwapTradeEvents(tx,expectedPool){
   const quoteRaw=u64(bytes,64);
   const timestamp=u64(bytes,8);
   if(quoteRaw<=0n||timestamp<=0n)throw Error('PUMPSWAP_EVENT_INVALID_QUOTE');
-  result.push({side,pool,quoteRaw,timestamp:Number(timestamp),source:'OFFICIAL_PUMPSWAP_BUY_SELL_EVENT'});
+  const fees=bytes.length>=360?{lpFeeRaw:u64(bytes,80).toString(),lpFeeBps:u64(bytes,72).toString(),protocolFeeRaw:u64(bytes,96).toString(),protocolFeeBps:u64(bytes,88).toString(),creatorFeeRaw:u64(bytes,352).toString(),creatorFeeBps:u64(bytes,344).toString()}:null;
+  result.push({side,pool,quoteRaw,timestamp:Number(timestamp),fees,source:'OFFICIAL_PUMPSWAP_BUY_SELL_EVENT'});
  }
  return result;
 }
@@ -59,7 +60,7 @@ export function swapQuoteDelta(tx,{pool,baseVault,quoteVault,baseMint,quoteMint}
  const base=vaultAmount(tx,baseVault),quote=vaultAmount(tx,quoteVault);
  if(base.mint!==baseMint||quote.mint!==quoteMint)throw Error('TX_VAULT_MINT_MISMATCH');
  if(base.delta===0n||quote.delta===0n||Math.sign(Number(base.delta))===Math.sign(Number(quote.delta)))throw Error('TX_VAULT_DELTA_NOT_SWAP');
- const events=parsePumpSwapTradeEvents(tx,pool);const exactQuoteRaw=events.reduce((n,e)=>n+e.quoteRaw,0n);const deltaAbs=quote.delta<0n?-quote.delta:quote.delta;if(exactQuoteRaw>0n&&(exactQuoteRaw>deltaAbs*3n||deltaAbs>exactQuoteRaw*3n))throw Error('EVENT_AND_VAULT_DELTA_INCONSISTENT');return {swap:true,quoteAbsRaw:deltaAbs,exactQuoteRaw,events:events.map(e=>({side:e.side,quoteRaw:e.quoteRaw.toString()})),quoteDecimals:quote.decimals,baseRaw:base.delta.toString(),quoteRaw:quote.delta.toString()};
+ const events=parsePumpSwapTradeEvents(tx,pool);const exactQuoteRaw=events.reduce((n,e)=>n+e.quoteRaw,0n);const deltaAbs=quote.delta<0n?-quote.delta:quote.delta;if(exactQuoteRaw>0n&&(exactQuoteRaw>deltaAbs*3n||deltaAbs>exactQuoteRaw*3n))throw Error('EVENT_AND_VAULT_DELTA_INCONSISTENT');return {swap:true,quoteAbsRaw:deltaAbs,exactQuoteRaw,events:events.map(e=>({side:e.side,quoteRaw:e.quoteRaw.toString(),fees:e.fees})),quoteDecimals:quote.decimals,baseRaw:base.delta.toString(),quoteRaw:quote.delta.toString()};
 }
 export function hourlyCoverage(signatures,nowSeconds=Math.floor(Date.now()/1000),limit=16,maxTransactions=6){
  if(!Array.isArray(signatures)||signatures.length>limit)throw Error('BAD_SIGNATURES_SHAPE');
