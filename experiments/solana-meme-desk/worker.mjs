@@ -15,54 +15,93 @@ function poolAddr(s){return String(s||'').replace(/^solana_/,'')}
 function mintAddr(s){return String(s||'').replace(/^solana_/,'')}
 function goodAddress(s){return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s)}
 const QUOTE=new Set(['So11111111111111111111111111111111111111112','EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v','Es9vMFrzaCERURFykUWrW7Gziydn5uuZeZvVDjjZS4u']);
-async function scoutFallbackDex(env){
-  // Backup feed is explicitly a NON-EXHAUSTIVE sample of promoted/profiled tokens.
-  const feeds=await Promise.allSettled([
-    readJson('https://api.dexscreener.com/token-profiles/latest/v1'),
-    readJson('https://api.dexscreener.com/token-boosts/latest/v1')
-  ]);
-  const mintSet=new Set();
-  for(const f of feeds){
-    if(f.status!=='fulfilled'||!Array.isArray(f.value))continue;
-    for(const x of f.value){
-      if(x.chainId==='solana'&&goodAddress(x.tokenAddress)&&!QUOTE.has(x.tokenAddress))mintSet.add(x.tokenAddress);
-      if(mintSet.size>=30)break;
-    }
-  }
-  if(!mintSet.size){await event(env,'Scout','BACKUP_EMPTY',null,null,'DexScreener backup empty; no exhaustive discovery');return [];}
-  const pairs=await readJson('https://api.dexscreener.com/tokens/v1/solana/'+[...mintSet].join(','));
-  if(!Array.isArray(pairs))throw Error('FALLBACK_PAIRS_INVALID');
-  const recent=Date.now()-30*60*1000;const found=new Map();
-  for(const p of pairs){
-    if(p.chainId!=='solana'||!/(raydium|pumpswap|pump-swap|pumpfun)/i.test(p.dexId||''))continue;
-    const c=p.baseToken||{},mint=c.address||'',pool=p.pairAddress||'',time=Number(p.pairCreatedAt||0);
-    if(!goodAddress(mint)||!goodAddress(pool)||QUOTE.has(mint)||!time||time<recent||time>Date.now()+60000)continue;
-    found.set(pool,{mint,pool,dex:String(p.dexId||''),symbol:String(c.symbol||mint.slice(0,6)).slice(0,45),created:new Date(time).toISOString(),volume:fin(p.volume?.h1),price:fin(p.priceUsd)});
-  }
-  await event(env,'Scout','BACKUP_SAMPLE',null,null,'DexScreener promoted/profiled tokens ONLY; NOT an exhaustive live-pair feed',{profiles:mintSet.size,pairs:pairs.length,matching:found.size});
-  return [...found.values()];
+// Source-health ledger: avoid retry storms and never treat a limited discovery sample as exhaustive.
+async function sourcePull(env,name,loader){
+ const status=await first(env,'SELECT blocked_until FROM scout_sources WHERE source=?',name);
+ if(status?.blocked_until&&Date.parse(status.blocked_until)>Date.now())return {ok:false,skipped:true,error:'COOLDOWN_ACTIVE',data:[]};
+ try{
+  const data=await loader();
+  if(!Array.isArray(data))throw Error('INVALID_PROVIDER_SHAPE');
+  await env.DB.prepare("INSERT INTO scout_sources(source,last_checked,last_success,last_error,blocked_until,error_count,ok_count,last_count) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(source) DO UPDATE SET last_checked=excluded.last_checked,last_success=excluded.last_success,last_error=NULL,blocked_until=NULL,ok_count=scout_sources.ok_count+1,last_count=excluded.last_count")
+  .bind(name,now(),now(),null,null,0,1,data.length).run();
+  return {ok:true,skipped:false,error:null,data};
+ }catch(e){
+  const err=qs(e.message);
+  const hold=err.includes('HTTP_429')?30*60*1000:5*60*1000;
+  await env.DB.prepare("INSERT INTO scout_sources(source,last_checked,last_error,blocked_until,error_count,ok_count,last_count) VALUES(?,?,?,?,?,?,?) ON CONFLICT(source) DO UPDATE SET last_checked=excluded.last_checked,last_error=excluded.last_error,blocked_until=excluded.blocked_until,error_count=scout_sources.error_count+1,last_count=0")
+   .bind(name,now(),err,new Date(Date.now()+hold).toISOString(),1,0,0).run();
+  return {ok:false,skipped:false,error:err,data:[]};
+ }
+}
+function recentlyOpened(value){
+ const stamp=typeof value==='number'||/^[0-9]+$/.test(String(value||''))?Number(value)*1000:Date.parse(String(value||''));
+ return Number.isFinite(stamp)&&stamp<=Date.now()+60*1000&&Date.now()-stamp<=30*60*1000?new Date(stamp).toISOString():null;
+}
+function parseRaydiumPools(payload){
+ if(payload?.success!==true||!Array.isArray(payload?.data?.data))throw Error('RAYDIUM_RESPONSE_UNVERIFIABLE');
+ const found=[];
+ for(const p of payload.data.data){
+  const opened=recentlyOpened(p.openTime),pool=p.id;
+  const firstMint=p.mintA?.address,secondMint=p.mintB?.address;
+  if(!opened||!goodAddress(pool)||!goodAddress(firstMint)||!goodAddress(secondMint))continue;
+  const base=QUOTE.has(firstMint)?secondMint:firstMint;
+  if(QUOTE.has(base)||!goodAddress(base))continue;
+  found.push({pool,mint:base,symbol:String(firstMint===base?p.mintA?.symbol:p.mintB?.symbol||base.slice(0,8)).slice(0,45),dex:'raydium',created:opened,volume:NaN,price:NaN});
+ }
+ return found;
+}
+async function scoutRaydiumFeed(){
+ const payload=await readJson('https://api-v3.raydium.io/pools/info/list?poolType=standard&poolSortField=apr24h&sortType=desc&pageSize=100&page=1');
+ return parseRaydiumPools(payload);
+}
+async function scoutGeckoFeed(){
+ const payload=await readJson('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1&include=base_token,quote_token,dex');
+ if(!Array.isArray(payload?.data))throw Error('GECKO_RESPONSE_UNVERIFIABLE');
+ const found=[];
+ for(const x of payload.data){
+  const dex=String(x.relationships?.dex?.data?.id||'').toLowerCase();
+  if(!/(raydium|pumpswap|pump-swap|pumpfun)/.test(dex))continue;
+  const baseMint=mintAddr(x.relationships?.base_token?.data?.id),quoteMint=mintAddr(x.relationships?.quote_token?.data?.id);
+  const mint=QUOTE.has(baseMint)?quoteMint:baseMint,pool=poolAddr(x.id),created=recentlyOpened(x.attributes?.pool_created_at);
+  if(!created||!goodAddress(mint)||!goodAddress(pool)||QUOTE.has(mint))continue;
+  found.push({pool,mint,dex,created,symbol:String(x.attributes?.name||mint.slice(0,8)).slice(0,45),volume:NaN,price:NaN});
+ }
+ return found;
+}
+async function scoutDexSample(){
+ const p=await Promise.allSettled([readJson('https://api.dexscreener.com/token-profiles/latest/v1'),readJson('https://api.dexscreener.com/token-boosts/latest/v1')]);
+ const mints=new Set(); for(const x of p){if(x.status!=='fulfilled'||!Array.isArray(x.value))continue;for(const y of x.value){if(y.chainId==='solana'&&goodAddress(y.tokenAddress)&&!QUOTE.has(y.tokenAddress))mints.add(y.tokenAddress);if(mints.size>=30)break;}}
+ if(!mints.size)throw Error('DEX_PROFILE_SOURCE_EMPTY_OR_RATE_LIMITED');
+ const pairs=await readJson('https://api.dexscreener.com/tokens/v1/solana/'+[...mints].join(','));
+ if(!Array.isArray(pairs))throw Error('DEX_PAIRS_BAD_SHAPE');
+ return pairs.filter(x=>x.chainId==='solana'&&/(raydium|pumpswap|pumpfun)/i.test(x.dexId||'')&&recentlyOpened(Number(x.pairCreatedAt||0)/1000)&&goodAddress(x.pairAddress)&&goodAddress(x.baseToken?.address)&&!QUOTE.has(x.baseToken.address)).map(x=>({
+  pool:x.pairAddress,mint:x.baseToken.address,dex:String(x.dexId).toLowerCase(),symbol:String(x.baseToken.symbol||'UNKNOWN').slice(0,45),created:recentlyOpened(Number(x.pairCreatedAt)/1000),volume:NaN,price:NaN}));
 }
 async function scout(env){
-  let pools=[];
-  try{
-    const feed=await readJson('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1&include=base_token,quote_token,dex');
-    if(!Array.isArray(feed.data))throw Error('GECKOTERMINAL_BAD_FEED');
-    for(const x of feed.data){
-      const dex=String(x.relationships?.dex?.data?.id||'').toLowerCase();
-      if(!/(raydium|pumpswap|pump-swap|pumpfun)/.test(dex))continue;
-      const base=mintAddr(x.relationships?.base_token?.data?.id),quote=mintAddr(x.relationships?.quote_token?.data?.id);
-      const mint=QUOTE.has(base)?quote:base,pool=poolAddr(x.id);
-      if(!goodAddress(mint)||!goodAddress(pool)||QUOTE.has(mint))continue;
-      const a=x.attributes||{};
-      pools.push({pool,mint,symbol:String(a.name||mint.slice(0,6)).slice(0,45),dex,created:a.pool_created_at||null,volume:fin(a.volume_usd?.h1),price:fin(QUOTE.has(base)?a.quote_token_price_usd:a.base_token_price_usd)});
-    }
-    await env.DB.prepare("UPDATE state SET feed_health='SOURCE_UP',last_feed_ok=?,last_error=NULL WHERE id=1").bind(now()).run();await event(env,'Scout','SOURCE',null,null,'GeckoTerminal new pools feed operational',{matched:pools.length});
-  }catch(e){
-    await env.DB.prepare("UPDATE state SET feed_health='DEGRADED',last_error=? WHERE id=1").bind(qs(e.message)).run();await event(env,'Scout','SOURCE_FALLBACK',null,null,'GeckoTerminal unavailable: '+qs(e.message)+'; using limited DexScreener backup');
-    pools=await scoutFallbackDex(env);
-  }
-  await event(env,'Scout','DISCOVER',null,null,'Found '+pools.length+' Raydium/PumpSwap pools in current feed',{count:pools.length});
-  return pools;
+ const providers=[
+  ['RAYDIUM_APR_SAMPLE',scoutRaydiumFeed],
+  ['GECKO_NEW_POOLS_PAGE1',scoutGeckoFeed]
+ ];
+ const outcomes=[];
+ for(const [name,loader] of providers){
+  const r=await sourcePull(env,name,loader);
+  outcomes.push({name,ok:r.ok,skipped:r.skipped,count:r.data.length,error:r.error,data:r.data});
+ }
+ if(outcomes.reduce((sum,x)=>sum+x.count,0)<3){
+  const f=await sourcePull(env,'DEX_PROMOTED_SAMPLE',scoutDexSample);
+  outcomes.push({name:'DEX_PROMOTED_SAMPLE',ok:f.ok,skipped:f.skipped,count:f.data.length,error:f.error,data:f.data});
+ }
+ const pools=new Map();
+ for(const x of outcomes)for(const y of x.data){if(!pools.has(y.pool))pools.set(y.pool,y)}
+ const hasPrimary=outcomes.slice(0,2).every(x=>x.ok);
+ const anySucceeded=outcomes.some(x=>x.ok);
+ const status=!anySucceeded?'BLOCKED':hasPrimary?'PARTIAL_COVERAGE':'DEGRADED';
+ const errors=outcomes.filter(x=>!x.ok).map(x=>x.name+':'+x.error);
+ await env.DB.prepare('UPDATE state SET feed_health=?,last_error=?,last_feed_ok=CASE WHEN ? THEN ? ELSE last_feed_ok END WHERE id=1')
+   .bind(status,errors.length?errors.join(' | ').slice(0,450):null,anySucceeded?1:0,now()).run();
+ await event(env,'Scout','SOURCE_STATUS',null,null,'Discovery '+status+' · '+pools.size+' new candidate pool(s); all feeds are samples',
+   {sources:outcomes.map(({name,ok,skipped,count,error})=>({name,ok,skipped,count,error})),coverage:'NON_EXHAUSTIVE'});
+ return [...pools.values()];
 }
 async function market(env,c){const pairs=await readJson('https://api.dexscreener.com/token-pairs/v1/solana/'+encodeURIComponent(c.mint));if(!Array.isArray(pairs))throw Error('DEX_PAIRS_INVALID');const p=pairs.find(p=>p.pairAddress===c.pool&&p.chainId==='solana');if(!p)throw Error('EXACT_POOL_NOT_LISTED');if(p.baseToken?.address!==c.mint)throw Error('BASE_ASSET_PRICE_AMBIGUOUS');return {price:fin(p.priceUsd),volume:fin(p.volume?.h1),liquidity:fin(p.liquidity?.usd),pair:p,dex:p.dexId};}
 async function markForRisk(env,c){
@@ -189,7 +228,7 @@ async function risk(env){
  return {ok:failures.length===0,failures,positionsChecked:positions.length};
 }
 async function snapshot(env){const v=await value(env);await env.DB.prepare('INSERT OR REPLACE INTO equity(ts,equity,cash,exposure,source) VALUES(?,?,?,?,?)').bind(now(),usdN(v.equity),usdN(v.state.cash),usdN(v.exposure),'last_verified_marks_or_entry').run();return v}
-async function cycle(env){const start=Date.now();const lock=await env.DB.prepare('UPDATE state SET lease_until=? WHERE id=1 AND lease_until<?').bind(start+55000,start).run();if((lock.meta?.changes||0)!==1)return;try{const s=await first(env,'SELECT * FROM state WHERE id=1');const riskResult=await risk(env);if(!riskResult.ok){await event(env,'Risk','ENTRY_BLOCKED',null,null,'No new entries: unable to monitor existing position prices',riskResult);await env.DB.prepare("UPDATE state SET feed_health='DEGRADED',last_error=?,cycles_degraded=cycles_degraded+1 WHERE id=1").bind('RISK_MARK_UNAVAILABLE').run();return;}if(s.paused)return;const age=s.last_scout_started?Date.now()-Date.parse(s.last_scout_started):Infinity;if(Number.isFinite(age)&&age<300000)return;await env.DB.prepare('UPDATE state SET last_scout_started=? WHERE id=1').bind(now()).run();const poolList=await scout(env);let handled=0,unverified=0;for(const c of poolList){if(handled>=CFG.scanPerCycle)break;let candidate=await first(env,'SELECT verdict,retry_after FROM candidates WHERE pool=?',c.pool);if(candidate&&candidate.verdict!=='DATA_ERROR')continue;if(candidate?.retry_after&&Date.parse(candidate.retry_after)>Date.now())continue;const age=c.created?Date.now()-Date.parse(c.created):0;if(Number.isFinite(age)&&age>30*60*1000)continue;handled++;await env.DB.prepare('INSERT OR IGNORE INTO candidates(pool,mint,symbol,dex,created_at,seen_at,volume_h1,verdict,reason) VALUES(?,?,?,?,?,?,?,?,?)').bind(c.pool,c.mint,c.symbol,c.dex,c.created,now(),Number.isFinite(c.volume)?c.volume:null,'NEW','DISCOVERED').run();await event(env,'Scout','CANDIDATE',c.mint,c.symbol,'New scoped pool '+c.dex,{pool:c.pool});try{const m=await market(env,c);if(!Number.isFinite(m.volume)||m.volume<CFG.minH1Volume){await reject(env,c,'Filter','VOLUME_H1_LT_40000_OR_UNKNOWN',{volume_h1:m.volume});continue}const {rugReport,...mint}=await mintInfo(env,c);if(!mint.mintRevoked||!mint.freezeRevoked){await reject(env,c,'Filter','MINT_OR_FREEZE_AUTHORITY_ACTIVE',mint);continue}const rug=await rugInfo(c,rugReport);const check=checklist(mint,m,rug);if(!check.pass){await reject(env,c,'Filter',check.reasons.join('|'),check);continue}await event(env,'Filter','PASS',c.mint,c.symbol,'All four mandatory gates passed',{check});const decision=analyst(c,m,check);if(!decision.pass){await reject(env,c,'Analyst',decision.issues.join('|'),{check,decision});continue}await event(env,'Analyst','PASS',c.mint,c.symbol,'Evidence-based score '+decision.score,{analysis:decision});await env.DB.prepare('UPDATE candidates SET verdict=?,reason=?,audit=? WHERE pool=?').bind('ACCEPTED','ALL_GATES_PASS',JSON.stringify({check,decision}).slice(0,6000),c.pool).run();await executor(env,c,m,check,decision);}catch(e){unverified++;await reject(env,c,'Filter','SOURCE_UNVERIFIABLE: '+qs(e.message),{error:String(e.message),pool:c.pool},true);}}const current=await first(env,'SELECT feed_health,last_error FROM state WHERE id=1');if(unverified>0){await env.DB.prepare("UPDATE state SET feed_health='DEGRADED',last_error=?,cycles_degraded=cycles_degraded+1 WHERE id=1").bind('Failed required checks for '+unverified+' pool(s); see audit').run();await event(env,'Logger','PARTIAL_CYCLE',null,null,'Attempted '+handled+' candidates; '+unverified+' data errors',{feed:poolList.length,handled,unverified});}else if(current.feed_health==='DEGRADED'){await env.DB.prepare('UPDATE state SET cycles_degraded=cycles_degraded+1 WHERE id=1').run();await event(env,'Logger','DEGRADED_CYCLE',null,null,'Primary discovery unavailable; backup is non-exhaustive',{feed:poolList.length,handled});}else{await event(env,'Logger','CYCLE',null,null,'Checked '+handled+' candidates without source errors',{feed:poolList.length,handled});}}catch(e){await event(env,'Logger','ERROR',null,null,'Cycle error: '+qs(e.message));await env.DB.prepare("UPDATE state SET feed_health='BLOCKED',cycles_degraded=cycles_degraded+1,last_error=? WHERE id=1").bind(qs(e.message)).run()}finally{try{await snapshot(env)}catch(e){await event(env,'Logger','ERROR',null,null,'Equity snapshot failed: '+qs(e.message))}await env.DB.prepare('UPDATE state SET last_cycle=?,cycles=cycles+1,lease_until=0 WHERE id=1').bind(now()).run()}}
+async function cycle(env){const start=Date.now();const lock=await env.DB.prepare('UPDATE state SET lease_until=? WHERE id=1 AND lease_until<?').bind(start+55000,start).run();if((lock.meta?.changes||0)!==1)return;try{const s=await first(env,'SELECT * FROM state WHERE id=1');const riskResult=await risk(env);if(!riskResult.ok){await event(env,'Risk','ENTRY_BLOCKED',null,null,'No new entries: unable to monitor existing position prices',riskResult);await env.DB.prepare("UPDATE state SET feed_health='DEGRADED',last_error=?,cycles_degraded=cycles_degraded+1 WHERE id=1").bind('RISK_MARK_UNAVAILABLE').run();return;}if(s.paused){const elapsed=s.last_scout_started?Date.now()-Date.parse(s.last_scout_started):Infinity;if(Number.isFinite(elapsed)&&elapsed<300000)return;await env.DB.prepare('UPDATE state SET last_scout_started=? WHERE id=1').bind(now()).run();try{const sample=await scout(env);await event(env,'Scout','DIAGNOSTIC_ONLY',null,null,'Scanner remains paused; '+sample.length+' pools discovered, zero orders possible',{count:sample.length});}catch(e){await env.DB.prepare("UPDATE state SET feed_health='BLOCKED',last_error=? WHERE id=1").bind(qs(e.message)).run();await event(env,'Scout','DIAGNOSTIC_ERROR',null,null,qs(e.message));}return;}const age=s.last_scout_started?Date.now()-Date.parse(s.last_scout_started):Infinity;if(Number.isFinite(age)&&age<300000)return;await env.DB.prepare('UPDATE state SET last_scout_started=? WHERE id=1').bind(now()).run();const poolList=await scout(env);let handled=0,unverified=0;for(const c of poolList){if(handled>=CFG.scanPerCycle)break;let candidate=await first(env,'SELECT verdict,retry_after FROM candidates WHERE pool=?',c.pool);if(candidate&&candidate.verdict!=='DATA_ERROR')continue;if(candidate?.retry_after&&Date.parse(candidate.retry_after)>Date.now())continue;const age=c.created?Date.now()-Date.parse(c.created):0;if(Number.isFinite(age)&&age>30*60*1000)continue;handled++;await env.DB.prepare('INSERT OR IGNORE INTO candidates(pool,mint,symbol,dex,created_at,seen_at,volume_h1,verdict,reason) VALUES(?,?,?,?,?,?,?,?,?)').bind(c.pool,c.mint,c.symbol,c.dex,c.created,now(),Number.isFinite(c.volume)?c.volume:null,'NEW','DISCOVERED').run();await event(env,'Scout','CANDIDATE',c.mint,c.symbol,'New scoped pool '+c.dex,{pool:c.pool});try{const m=await market(env,c);if(!Number.isFinite(m.volume)||m.volume<CFG.minH1Volume){await reject(env,c,'Filter','VOLUME_H1_LT_40000_OR_UNKNOWN',{volume_h1:m.volume});continue}const {rugReport,...mint}=await mintInfo(env,c);if(!mint.mintRevoked||!mint.freezeRevoked){await reject(env,c,'Filter','MINT_OR_FREEZE_AUTHORITY_ACTIVE',mint);continue}const rug=await rugInfo(c,rugReport);const check=checklist(mint,m,rug);if(!check.pass){await reject(env,c,'Filter',check.reasons.join('|'),check);continue}await event(env,'Filter','PASS',c.mint,c.symbol,'All four mandatory gates passed',{check});const decision=analyst(c,m,check);if(!decision.pass){await reject(env,c,'Analyst',decision.issues.join('|'),{check,decision});continue}await event(env,'Analyst','PASS',c.mint,c.symbol,'Evidence-based score '+decision.score,{analysis:decision});await env.DB.prepare('UPDATE candidates SET verdict=?,reason=?,audit=? WHERE pool=?').bind('ACCEPTED','ALL_GATES_PASS',JSON.stringify({check,decision}).slice(0,6000),c.pool).run();await executor(env,c,m,check,decision);}catch(e){unverified++;await reject(env,c,'Filter','SOURCE_UNVERIFIABLE: '+qs(e.message),{error:String(e.message),pool:c.pool},true);}}const current=await first(env,'SELECT feed_health,last_error FROM state WHERE id=1');if(unverified>0){await env.DB.prepare("UPDATE state SET feed_health='DEGRADED',last_error=?,cycles_degraded=cycles_degraded+1 WHERE id=1").bind('Failed required checks for '+unverified+' pool(s); see audit').run();await event(env,'Logger','PARTIAL_CYCLE',null,null,'Attempted '+handled+' candidates; '+unverified+' data errors',{feed:poolList.length,handled,unverified});}else if(current.feed_health!=='SOURCE_UP'){await env.DB.prepare('UPDATE state SET cycles_degraded=cycles_degraded+1 WHERE id=1').run();await event(env,'Logger','DEGRADED_CYCLE',null,null,'Primary discovery unavailable; backup is non-exhaustive',{feed:poolList.length,handled});}else{await event(env,'Logger','CYCLE',null,null,'Checked '+handled+' candidates without source errors',{feed:poolList.length,handled});}}catch(e){await event(env,'Logger','ERROR',null,null,'Cycle error: '+qs(e.message));await env.DB.prepare("UPDATE state SET feed_health='BLOCKED',cycles_degraded=cycles_degraded+1,last_error=? WHERE id=1").bind(qs(e.message)).run()}finally{try{await snapshot(env)}catch(e){await event(env,'Logger','ERROR',null,null,'Equity snapshot failed: '+qs(e.message))}await env.DB.prepare('UPDATE state SET last_cycle=?,cycles=cycles+1,lease_until=0 WHERE id=1').bind(now()).run()}}
 async function state(env){const v=await value(env);const stalePositions=v.positions.filter(p=>!p.quote_ts||Date.now()-Date.parse(p.quote_ts)>120000||!Number.isFinite(Date.parse(p.quote_ts))||!['DEXSCREENER_EXACT_POOL','GECKOTERMINAL_EXACT_POOL'].includes(p.mark_source));const pricesFresh=stalePositions.length===0;const events=(await sql(env,'SELECT * FROM events ORDER BY id DESC LIMIT 75')).results||[];const trades=(await sql(env,'SELECT * FROM trades ORDER BY id DESC LIMIT 25')).results||[];const equityPoints=(await sql(env,'SELECT * FROM (SELECT * FROM equity ORDER BY ts DESC LIMIT 250) ORDER BY ts ASC')).results||[];const counts=await first(env,"SELECT (SELECT count(*) FROM candidates) screened,(SELECT count(*) FROM candidates WHERE verdict='REJECTED') rejected,(SELECT count(*) FROM candidates WHERE verdict='DATA_ERROR') data_errors,(SELECT count(*) FROM trades) trades");return {...v,events,trades,equityPoints,counts,pricesFresh,stalePositions:stalePositions.map(x=>({mint:x.mint,symbol:x.symbol,quote_ts:x.quote_ts})),mode:'PAPER',timestamp:now()}}
 async function recap(env){const d=await state(env);const rejectionBreakdown=(await sql(env,"SELECT reason,count(*) n FROM candidates WHERE verdict='REJECTED' GROUP BY reason ORDER BY n DESC LIMIT 30")).results||[];const questionable=(await sql(env,"SELECT id,side,symbol,fill_quality,realized_pnl FROM trades WHERE fill_quality='UNVERIFIED_INDICATIVE_FILL'")).results||[];const recentTrades=(await sql(env,"SELECT * FROM trades WHERE datetime(ts)>=datetime('now','-12 hours') ORDER BY id DESC LIMIT 150")).results||[];const recentEvents=(await sql(env,"SELECT * FROM events WHERE datetime(ts)>=datetime('now','-12 hours') ORDER BY id DESC LIMIT 250")).results||[];return {asOf:now(),windowHours:12,mode:'PAPER',qualityFlags:questionable,paperEquityQuality:questionable.length?'CONTAINS_UNVERIFIED_INDICATIVE_FILL':'MODEL_ONLY',initial:d.state.initial,cash:d.state.cash,equity:d.equity,unrealizedExposure:d.exposure,unrealizedAndRealizedPnL:d.pricesFresh?d.equity-d.state.initial:null,valuationStatus:d.pricesFresh?'CURRENT':'STALE_MARKS_UNVERIFIABLE',stalePositions:d.stalePositions,cycles:d.state.cycles,lastCycle:d.state.last_cycle,lastError:d.state.last_error,counts:d.counts,rejectionBreakdown,recentTrades,recentEvents,openPositions:d.positions,warning:'Paper fills are modeled, never executed. Exit signals on Helius/Jupiter indicative prices remain unfilled. Existing historic Ginnan virtual exit relied on an indicative Helius mark, not a pool fill. One-minute polling cannot guarantee an 8% stop.'}}
 function response(data){return new Response(JSON.stringify(data),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store','access-control-allow-origin':'*'}})}
