@@ -5,12 +5,7 @@
 export const PUMP_AMM_PROGRAM='pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA';
 export const WSOL='So11111111111111111111111111111111111111112';
 export const USDC='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const TOKEN_PROGRAMS=new Set([
- 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
- 'TokenzQdBNbLqP5VEhdkAS6EPFsd2V6EPFsd2V6EPFsd2V6EPF', // rejected if unmatched; exact official Token-2022 below
- 'TokenzQdBNbLqP5VEhdkAS6EPFsd2V6EPFsd2V6EPFsd2V6EPF'
-]);
-// Avoid claiming Token-2022 support before a live Token-2022 fixture is validated.
+// Only SPL Token classic is accepted here until Token-2022 layouts and extensions are audited.
 const B58='123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 function validAddress(s){return typeof s==='string'&&s.length>=32&&s.length<=44&&[...s].every(c=>B58.includes(c))}
 export function toBase58(bytes){
