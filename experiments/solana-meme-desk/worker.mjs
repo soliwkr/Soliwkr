@@ -15,7 +15,55 @@ function poolAddr(s){return String(s||'').replace(/^solana_/,'')}
 function mintAddr(s){return String(s||'').replace(/^solana_/,'')}
 function goodAddress(s){return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s)}
 const QUOTE=new Set(['So11111111111111111111111111111111111111112','EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v','Es9vMFrzaCERURFykUWrW7Gziydn5uuZeZvVDjjZS4u']);
-async function scout(env){const feed=await readJson('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1&include=base_token,quote_token,dex');if(!Array.isArray(feed.data))throw Error('SCOUT_INVALID_DATA');const pools=[];for(const x of feed.data){const dex=String(x.relationships?.dex?.data?.id||'').toLowerCase();if(!/(raydium|pumpswap|pump-swap)/.test(dex))continue;const base=mintAddr(x.relationships?.base_token?.data?.id);const quote=mintAddr(x.relationships?.quote_token?.data?.id);const mint=QUOTE.has(base)?quote:base;const pool=poolAddr(x.id);if(!goodAddress(mint)||!goodAddress(pool)||QUOTE.has(mint))continue;const a=x.attributes||{};pools.push({pool,mint,symbol:String(a.name||mint.slice(0,6)).slice(0,45),dex,created:a.pool_created_at||null,volume:fin(a.volume_usd?.h1),price:fin(QUOTE.has(base)?a.quote_token_price_usd:a.base_token_price_usd)});}await event(env,'Scout','DISCOVER',null,null,'Found '+pools.length+' Raydium/PumpSwap pools in latest feed',{count:pools.length});return pools}
+async function scoutFallbackDex(env){
+  // Backup feed is explicitly a NON-EXHAUSTIVE sample of promoted/profiled tokens.
+  const feeds=await Promise.allSettled([
+    readJson('https://api.dexscreener.com/token-profiles/latest/v1'),
+    readJson('https://api.dexscreener.com/token-boosts/latest/v1')
+  ]);
+  const mintSet=new Set();
+  for(const f of feeds){
+    if(f.status!=='fulfilled'||!Array.isArray(f.value))continue;
+    for(const x of f.value){
+      if(x.chainId==='solana'&&goodAddress(x.tokenAddress)&&!QUOTE.has(x.tokenAddress))mintSet.add(x.tokenAddress);
+      if(mintSet.size>=30)break;
+    }
+  }
+  if(!mintSet.size)throw Error('FALLBACK_NO_DISCOVERY_DATA');
+  const pairs=await readJson('https://api.dexscreener.com/tokens/v1/solana/'+[...mintSet].join(','));
+  if(!Array.isArray(pairs))throw Error('FALLBACK_PAIRS_INVALID');
+  const recent=Date.now()-30*60*1000;const found=new Map();
+  for(const p of pairs){
+    if(p.chainId!=='solana'||!/(raydium|pumpswap|pump-swap|pumpfun)/i.test(p.dexId||''))continue;
+    const c=p.baseToken||{},mint=c.address||'',pool=p.pairAddress||'',time=Number(p.pairCreatedAt||0);
+    if(!goodAddress(mint)||!goodAddress(pool)||QUOTE.has(mint)||!time||time<recent||time>Date.now()+60000)continue;
+    found.set(pool,{mint,pool,dex:String(p.dexId||''),symbol:String(c.symbol||mint.slice(0,6)).slice(0,45),created:new Date(time).toISOString(),volume:fin(p.volume?.h1),price:fin(p.priceUsd)});
+  }
+  await event(env,'Scout','BACKUP_SAMPLE',null,null,'DexScreener promoted/profiled tokens ONLY; NOT an exhaustive live-pair feed',{profiles:mintSet.size,pairs:pairs.length,matching:found.size});
+  return [...found.values()];
+}
+async function scout(env){
+  let pools=[];
+  try{
+    const feed=await readJson('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1&include=base_token,quote_token,dex');
+    if(!Array.isArray(feed.data))throw Error('GECKOTERMINAL_BAD_FEED');
+    for(const x of feed.data){
+      const dex=String(x.relationships?.dex?.data?.id||'').toLowerCase();
+      if(!/(raydium|pumpswap|pump-swap|pumpfun)/.test(dex))continue;
+      const base=mintAddr(x.relationships?.base_token?.data?.id),quote=mintAddr(x.relationships?.quote_token?.data?.id);
+      const mint=QUOTE.has(base)?quote:base,pool=poolAddr(x.id);
+      if(!goodAddress(mint)||!goodAddress(pool)||QUOTE.has(mint))continue;
+      const a=x.attributes||{};
+      pools.push({pool,mint,symbol:String(a.name||mint.slice(0,6)).slice(0,45),dex,created:a.pool_created_at||null,volume:fin(a.volume_usd?.h1),price:fin(QUOTE.has(base)?a.quote_token_price_usd:a.base_token_price_usd)});
+    }
+    await event(env,'Scout','SOURCE',null,null,'GeckoTerminal new pools feed operational',{matched:pools.length});
+  }catch(e){
+    await event(env,'Scout','SOURCE_FALLBACK',null,null,'GeckoTerminal unavailable: '+qs(e.message)+'; using limited DexScreener backup');
+    pools=await scoutFallbackDex(env);
+  }
+  await event(env,'Scout','DISCOVER',null,null,'Found '+pools.length+' Raydium/PumpSwap pools in current feed',{count:pools.length});
+  return pools;
+}
 async function market(env,c){const pairs=await readJson('https://api.dexscreener.com/token-pairs/v1/solana/'+encodeURIComponent(c.mint));if(!Array.isArray(pairs))throw Error('DEX_PAIRS_INVALID');const p=pairs.find(p=>p.pairAddress===c.pool&&p.chainId==='solana');if(!p)throw Error('EXACT_POOL_NOT_LISTED');if(p.baseToken?.address!==c.mint)throw Error('BASE_ASSET_PRICE_AMBIGUOUS');return {price:fin(p.priceUsd),volume:fin(p.volume?.h1),liquidity:fin(p.liquidity?.usd),pair:p,dex:p.dexId};}
 async function mintInfo(c){const body={jsonrpc:'2.0',id:1,method:'getAccountInfo',params:[c.mint,{encoding:'jsonParsed',commitment:'confirmed'}]};const j=await readJson('https://api.mainnet-beta.solana.com',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)});const d=j?.result?.value?.data?.parsed;if(j.error||d?.type!=='mint'||!d.info)throw Error('MINT_RPC_UNVERIFIABLE');return {mintRevoked:d.info.mintAuthority===null,freezeRevoked:d.info.freezeAuthority===null,decimals:d.info.decimals,supply:d.info.supply};}
 async function rugInfo(c){const r=await readJson('https://api.rugcheck.xyz/v1/tokens/'+encodeURIComponent(c.mint)+'/report');if(!r||!Array.isArray(r.topHolders)||!Array.isArray(r.markets))throw Error('RUGCHECK_EVIDENCE_MISSING');const hs=r.topHolders.slice(0,10);if(!hs.length||hs.some(h=>!Number.isFinite(fin(h.pct))))throw Error('TOP_HOLDER_DATA_MISSING');const top10=hs.reduce((s,h)=>s+Number(h.pct),0);const pool=r.markets.find(m=>[m.pubkey,m.market,m.id,m.address].some(x=>x===c.pool));if(!pool)throw Error('POOL_LP_PROOF_MISSING');const pct=fin(pool.lp?.lpLockedPct??pool.lpLockedPct);if(!Number.isFinite(pct))throw Error('LP_LOCK_PCT_UNVERIFIABLE');return {top10Pct:top10,lpLockedPct:pct,marketId:c.pool,holdersMeasured:hs.length};}
