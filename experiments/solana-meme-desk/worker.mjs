@@ -327,4 +327,24 @@ async function onchainProbe(env){
   return;
  }
 }
-export default {async fetch(req,env){try{const p=new URL(req.url).pathname;if(p==='/')return new Response(DASHBOARD,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'}});if(p==='/api/state')return response(await state(env));if(p==='/api/recap')return response(await recap(env));if(p==='/api/selftest')return response({...paperRegressions(),mode:'PAPER',writes:false});if(p==='/api/onchain-proof'){const probe=await first(env,'SELECT ts,pool,mint,status,evidence FROM onchain_quote_probes ORDER BY id DESC LIMIT 1');return response({mode:'PAPER',scope:'READ_ONLY_POOL_SPOT_NO_VOLUME',probe:probe||null})}if(p==='/health'){const s=await first(env,'SELECT * FROM state WHERE id=1');let probe=null;if(new URL(req.url).searchParams.get('rpc')==='1'){try{const rpc=await heliusRpc(env,'getSlot',[{commitment:'confirmed'}]);probe={ok:Number.isSafeInteger(rpc?.result)&&rpc.result>0,slot:rpc.result};}catch(e){probe={ok:false,error:qs(e.message)}}}return response({service:'soliwkr-meme-desk',mode:'PAPER',worker:'ready',paused:!!s.paused,feedHealth:s.feed_health,heliusSecretConfigured:!!env.HELIUS_API_KEY,rpc:probe,lastCycle:s.last_cycle,cycles:s.cycles,lastError:s.last_error});}return response({error:'NOT_FOUND',mode:'PAPER'});}catch(e){return new Response(JSON.stringify({error:qs(e.message),mode:'PAPER'}),{status:503,headers:{'content-type':'application/json'}})}},async scheduled(controller,env,ctx){ctx.waitUntil(cycle(env));ctx.waitUntil(onchainProbe(env))}};
+// Separate sample of a recently discovered PumpSwap candidate, still read-only.
+async function onchainCandidateProbe(env){
+ try{
+  const already=await first(env,'SELECT id FROM onchain_quote_probes WHERE id=3');
+  if(already)return;
+  const c=await first(env,"SELECT pool,mint FROM candidates WHERE lower(dex)='pumpswap' AND LENGTH(mint)>=32 ORDER BY seen_at DESC LIMIT 1");
+  if(!c)return;
+  const inserted=await env.DB.prepare('INSERT OR IGNORE INTO onchain_quote_probes(id,ts,pool,mint,status,evidence) VALUES(3,?,?,?,?,?)')
+   .bind(now(),c.pool,c.mint,'RUNNING','Read-only new-pool spot probe').run();
+  if((inserted.meta?.changes||0)!==1)return;
+  try{
+   const result=await inspectPumpSwapPool((method,params)=>heliusRpc(env,method,params),c.pool,c.mint);
+   await env.DB.prepare("UPDATE onchain_quote_probes SET ts=?,status='PASS',evidence=? WHERE id=3")
+    .bind(now(),JSON.stringify(result)).run();
+  }catch(e){
+   await env.DB.prepare("UPDATE onchain_quote_probes SET ts=?,status='FAIL',evidence=? WHERE id=3")
+    .bind(now(),String(e.message||e).slice(0,600)).run();
+  }
+ }catch(e){return}
+}
+export default {async fetch(req,env){try{const p=new URL(req.url).pathname;if(p==='/')return new Response(DASHBOARD,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'}});if(p==='/api/state')return response(await state(env));if(p==='/api/recap')return response(await recap(env));if(p==='/api/selftest')return response({...paperRegressions(),mode:'PAPER',writes:false});if(p==='/api/onchain-proof'){const probe=await first(env,'SELECT id,ts,pool,mint,status,evidence FROM onchain_quote_probes ORDER BY id DESC LIMIT 1');return response({mode:'PAPER',scope:'READ_ONLY_POOL_SPOT_NO_VOLUME',probe:probe||null})}if(p==='/health'){const s=await first(env,'SELECT * FROM state WHERE id=1');let probe=null;if(new URL(req.url).searchParams.get('rpc')==='1'){try{const rpc=await heliusRpc(env,'getSlot',[{commitment:'confirmed'}]);probe={ok:Number.isSafeInteger(rpc?.result)&&rpc.result>0,slot:rpc.result};}catch(e){probe={ok:false,error:qs(e.message)}}}return response({service:'soliwkr-meme-desk',mode:'PAPER',worker:'ready',paused:!!s.paused,feedHealth:s.feed_health,heliusSecretConfigured:!!env.HELIUS_API_KEY,rpc:probe,lastCycle:s.last_cycle,cycles:s.cycles,lastError:s.last_error});}return response({error:'NOT_FOUND',mode:'PAPER'});}catch(e){return new Response(JSON.stringify({error:qs(e.message),mode:'PAPER'}),{status:503,headers:{'content-type':'application/json'}})}},async scheduled(controller,env,ctx){ctx.waitUntil(cycle(env));ctx.waitUntil(onchainProbe(env));ctx.waitUntil(onchainCandidateProbe(env))}};
