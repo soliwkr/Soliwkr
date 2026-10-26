@@ -50,6 +50,31 @@ function parseRaydiumPools(payload){
  }
  return found;
 }
+// Anonymous snapshot source, discoveredAt is the time the provider found a pool,
+// NOT verified on-chain creation time. Every candidate still needs all mandatory gates.
+function parseVenumNewPools(payload){
+ if(!payload||!Array.isArray(payload.pools))throw Error('VENUM_BAD_NEW_POOLS_RESPONSE');
+ const out=new Map();
+ for(const p of payload.pools){
+  const pool=p?.address,mA=p?.mintA,mB=p?.mintB,dex=String(p?.dex||'').toLowerCase();
+  if(!/(raydium|pumpswap|pump-swap|pump_swap)/.test(dex))continue;
+  if(!goodAddress(pool)||!goodAddress(mA)||!goodAddress(mB))continue;
+  const mint=QUOTE.has(mA)?mB:mA;
+  if(QUOTE.has(mint)||!goodAddress(mint))continue;
+  const raw=Number(p.discoveredAt);
+  const seconds=raw>=1e12?raw/1000:raw;
+  const seen=recentlyOpened(seconds);
+  if(!seen)continue;
+  const symbol=mint===mA?p.symbolA:p.symbolB;
+  out.set(pool,{pool,mint,symbol:String(symbol||mint.slice(0,7)).slice(0,45),dex,created:seen,
+   volume:NaN,price:NaN,discoveryKind:'PROVIDER_DISCOVERED_AT_NOT_POOL_CREATED_AT'});
+ }
+ return [...out.values()];
+}
+async function scoutVenumNewPools(){
+ const result=await readJson('https://api.venum.dev/v1/pools/new?limit=200');
+ return parseVenumNewPools(result);
+}
 async function scoutRaydiumFeed(){
  const payload=await readJson('https://api-v3.raydium.io/pools/info/list?poolType=standard&poolSortField=apr24h&sortType=desc&pageSize=100&page=1');
  return parseRaydiumPools(payload);
@@ -84,6 +109,7 @@ async function scoutDexSample(){
 }
 async function scout(env){
  const providers=[
+  ['VENUM_NEW_POOL_SNAPSHOT',scoutVenumNewPools],
   ['RAYDIUM_APR_SAMPLE',scoutRaydiumFeed],
   ['RAYDIUM_VOLUME_SAMPLE',scoutRaydiumVolumeFeed],
   ['GECKO_NEW_POOLS_PAGE1',scoutGeckoFeed]
@@ -99,7 +125,7 @@ async function scout(env){
  }
  const pools=new Map();
  for(const x of outcomes)for(const y of x.data){if(!pools.has(y.pool))pools.set(y.pool,y)}
- const hasPrimary=outcomes.some(x=>x.name==='GECKO_NEW_POOLS_PAGE1'&&x.ok)&&outcomes.some(x=>x.name.startsWith('RAYDIUM_')&&x.ok);
+ const hasPrimary=outcomes.some(x=>['VENUM_NEW_POOL_SNAPSHOT','GECKO_NEW_POOLS_PAGE1'].includes(x.name)&&x.ok);
  const anySucceeded=outcomes.some(x=>x.ok);
  const status=!anySucceeded?'BLOCKED':hasPrimary?'PARTIAL_COVERAGE':'DEGRADED';
  const errors=outcomes.filter(x=>!x.ok).map(x=>x.name+':'+x.error);
