@@ -98,7 +98,7 @@ export async function inspectPumpSwapPool(rpc,poolAddress,expectedBaseMint){
  if(baseToken.owner!==poolAddress||quoteToken.owner!==poolAddress||baseToken.mint!==pool.baseMint||quoteToken.mint!==pool.quoteMint)throw Error('VAULT_ADDRESS_OR_MINT_PROOF_FAILED');
  const baseDecimals=parseMintDecimals(byteData(baseMint)),quoteDecimals=parseMintDecimals(byteData(quoteMint));
  const price=quoteFromReserves({baseRaw:baseToken.amount,quoteRaw:quoteToken.amount,virtualQuote:pool.virtualQuote,baseDecimals,quoteDecimals});
- return {pool:poolAddress,mint:expectedBaseMint,quoteMint:pool.quoteMint,baseDecimals,quoteDecimals,
+ return {pool:poolAddress,mint:expectedBaseMint,baseMint:pool.baseMint,quoteMint:pool.quoteMint,baseVault:pool.baseVault,quoteVault:pool.quoteVault,baseDecimals,quoteDecimals,
   ...price,slot:response?.result?.context?.slot||null,baseTokenProgram:baseProgram,quoteTokenProgram:quoteProgram,
   extensionsAudited:baseProgram===SPL&&quoteProgram===SPL,
   source:'HELIUS_PUMPSWAP_POOL_ACCOUNTS',status:(baseProgram===SPL&&quoteProgram===SPL)?'ONCHAIN_SPOT_ONLY_VOLUME_UNKNOWN':'TOKEN_2022_EXTENSIONS_UNAUDITED_NOT_EXECUTABLE',mode:'READ_ONLY_PAPER_RESEARCH'};
