@@ -35,3 +35,12 @@ Gateway is a standalone TypeScript middleware service. The active published conn
 - https://docs.dexscreener.com/api/reference
 - https://developers.jup.ag/docs/price
 - https://www.helius.dev/solana-token-apis
+
+## Scout collector revision (26 October 2026)
+- New `scout_sources` D1 table records per-provider timestamps, success/error counts, cooldown and last candidate count. HTTP 429 cools down the affected provider for 30 minutes; other source errors for 5 minutes.
+- Sources sampled: Raydium v3 standard pools ordered by 24h APR (not creation date!), GeckoTerminal recent-pools page one, and DexScreener promoted/profiled tokens if coverage is sparse. **All are incomplete discovery samples.** Raydium v3 pool opening time is checked per row; do not assume APR ordering means freshness.
+- The diagnostic cron `*/5 * * * *` runs the Scout only while `state.paused=1` (and risk-checks existing positions). No automated new BUY is enabled.
+- `/api/state` and `/api/recap` include upstream provider status/cooldowns, with `scoutCoverage=NON_EXHAUSTIVE_SAMPLES`.
+- Parser fixtures, mandatory-risk fixtures and 429/cooldown tests passed. **Live source availability and repeated successful cron scans are not yet verified.**
+- Next gate: 3 successive cron diagnostic runs with valid source response, measured pool counts, no 429 source failures, and no unverified data treated as filter pass.
+- For truly event-driven fresh PumpSwap/Raydium pool creation, evaluate Helius enhanced CREATE_POOL webhook with strict address/source filters, signed/authenticated receiver, idempotency, event-credit budget cap and rollback before enabling it. No webhook has been created in this revision.
