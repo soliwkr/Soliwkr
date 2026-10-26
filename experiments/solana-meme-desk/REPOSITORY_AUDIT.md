@@ -44,3 +44,11 @@ Official sample pool probe id=1 failed due manual sample-mint typo; id=2 correct
 - On-chain fee configuration: LP 20 bps and protocol 5 bps; dynamic creator fees remain unverified. WSOL/USD via Helius DAS 100.15268 at observation; it is not a historical FX series.
 - The official PumpSwap IDL exposes BuyEvent / SellEvent quote amounts and fee fields, with Anchor event discriminators `[103,244,82,31,44,245,119,119]` and `[62,47,55,10,165,3,220,42]`. New parser extracts quote amounts and checks the source pool; probe 3 records its one-off validation without permitting trades.
 - A full-hour volume threshold for trading requires complete historical coverage and a defensible USD conversion; the bounded probe intentionally cannot validate busy pools needing >6 individual transaction reads. Do not enable the $40k/h gate from the probe's estimates.
+
+## Verified PumpSwap event amount and fee fields (20:46 UTC)
+- One-shot probe id 3 and id 4 completed on the same Scout-discovered Pool `MtD7C3bpRPP2LNim3DUfnoVTuRSQHBuCWhu9fKYKJqh`.
+- Signature `48FMUk5RumucnhuPsqSWyPDUwwmQbbYaVAjY2geWNaiFGebWYscRbDj98b8fq24fyNbgeUjX8HrFHWTJ75Wm4QZu` at slot 461792420 emits an official PumpSwap SellEvent.
+- Authoritative event quote amount: **21,873,181 raw WSOL units (0.021873181 SOL)**, versus quote-vault difference 0.021701475 SOL. This difference demonstrates why reserve deltas are not exact traded notional.
+- The exact event reports **LP 2bps/4375 raw, protocol 93bps/203421 raw, creator 30bps/65620 raw**. Live dynamic trade-specific fees differ materially from GlobalConfig's base 20bps/5bps settings. Never hardcode the latter as an executable quote.
+- Two transactions in the last hour on this pool; one was a matching trade event. Exact *native quote token* amount from this small complete window is now verified as `verifiedNative=true`. Volume in historical USD is still **not verified**, so `usableForHardVolumeGate=false` remains enforced.
+- The audit proof stores the signed transaction, slot, event fee components and Helius FX observation; no paper cash or orders changed. Do not treat this one quiet pool as evidence that the implementation scales to a $40k/h market.
