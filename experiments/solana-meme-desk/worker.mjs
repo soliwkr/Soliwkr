@@ -352,11 +352,11 @@ async function onchainCandidateProbe(env){
 // Single bounded on-chain market-quality probe. Strictly separate from trading.
 async function onchainMarketProof(env){
  try{
-  const existing=await first(env,'SELECT id FROM onchain_market_probes WHERE id=1');
+  const existing=await first(env,'SELECT id FROM onchain_market_probes WHERE id=2');
   if(existing)return;
   const candidate=await first(env,"SELECT pool,mint FROM onchain_quote_probes WHERE id=4 AND status='PASS'");
   if(!candidate)return;
-  const x=await env.DB.prepare('INSERT OR IGNORE INTO onchain_market_probes(id,ts,pool,mint,status,evidence) VALUES(1,?,?,?,?,?)')
+  const x=await env.DB.prepare('INSERT OR IGNORE INTO onchain_market_probes(id,ts,pool,mint,status,evidence) VALUES(2,?,?,?,?,?)')
    .bind(now(),candidate.pool,candidate.mint,'RUNNING','{}').run();
   if((x.meta?.changes||0)!==1)return;
   const rpc=(method,params)=>heliusRpc(env,method,params);
@@ -375,13 +375,13 @@ async function onchainMarketProof(env){
    measures.fees=fees.status==='fulfilled'?fees.value:{verified:false,error:qs(fees.reason?.message)};
    measures.extensions=extensions.status==='fulfilled'?extensions.value:{audited:false,error:qs(extensions.reason?.message)};
    measures.hourlyTurnover=volume.status==='fulfilled'?volume.value:{verified:false,error:qs(volume.reason?.message),usableForHardVolumeGate:false};
-   await env.DB.prepare("UPDATE onchain_market_probes SET ts=?,status='MEASURED_INCOMPLETE',evidence=? WHERE id=1")
+   await env.DB.prepare("UPDATE onchain_market_probes SET ts=?,status='MEASURED_INCOMPLETE',evidence=? WHERE id=2")
     .bind(now(),JSON.stringify(measures)).run();
   }catch(e){
    measures.fatal=qs(e.message);
-   await env.DB.prepare("UPDATE onchain_market_probes SET ts=?,status='FAIL',evidence=? WHERE id=1")
+   await env.DB.prepare("UPDATE onchain_market_probes SET ts=?,status='FAIL',evidence=? WHERE id=2")
     .bind(now(),JSON.stringify(measures)).run();
   }
  }catch(e){return}
 }
-export default {async fetch(req,env){try{const p=new URL(req.url).pathname;if(p==='/')return new Response(DASHBOARD,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'}});if(p==='/api/state')return response(await state(env));if(p==='/api/recap')return response(await recap(env));if(p==='/api/selftest')return response({...paperRegressions(),mode:'PAPER',writes:false});if(p==='/api/market-proof'){const r=await first(env,'SELECT id,ts,pool,mint,status,evidence FROM onchain_market_probes WHERE id=1');return response({mode:'PAPER',scope:'RESEARCH_READ_ONLY_NO_TRADE_DECISIONS',proof:r?{...r,evidence:JSON.parse(r.evidence||'{}')}:null})}if(p==='/api/onchain-proof'){const probe=await first(env,'SELECT id,ts,pool,mint,status,evidence FROM onchain_quote_probes ORDER BY id DESC LIMIT 1');return response({mode:'PAPER',scope:'READ_ONLY_POOL_SPOT_NO_VOLUME',probe:probe||null})}if(p==='/health'){const s=await first(env,'SELECT * FROM state WHERE id=1');let probe=null;if(new URL(req.url).searchParams.get('rpc')==='1'){try{const rpc=await heliusRpc(env,'getSlot',[{commitment:'confirmed'}]);probe={ok:Number.isSafeInteger(rpc?.result)&&rpc.result>0,slot:rpc.result};}catch(e){probe={ok:false,error:qs(e.message)}}}return response({service:'soliwkr-meme-desk',mode:'PAPER',worker:'ready',paused:!!s.paused,feedHealth:s.feed_health,heliusSecretConfigured:!!env.HELIUS_API_KEY,rpc:probe,lastCycle:s.last_cycle,cycles:s.cycles,lastError:s.last_error});}return response({error:'NOT_FOUND',mode:'PAPER'});}catch(e){return new Response(JSON.stringify({error:qs(e.message),mode:'PAPER'}),{status:503,headers:{'content-type':'application/json'}})}},async scheduled(controller,env,ctx){ctx.waitUntil(cycle(env));ctx.waitUntil(onchainProbe(env));ctx.waitUntil(onchainCandidateProbe(env));ctx.waitUntil(onchainMarketProof(env))}};
+export default {async fetch(req,env){try{const p=new URL(req.url).pathname;if(p==='/')return new Response(DASHBOARD,{headers:{'content-type':'text/html; charset=utf-8','cache-control':'no-cache','x-content-type-options':'nosniff'}});if(p==='/api/state')return response(await state(env));if(p==='/api/recap')return response(await recap(env));if(p==='/api/selftest')return response({...paperRegressions(),mode:'PAPER',writes:false});if(p==='/api/market-proof'){const r=await first(env,'SELECT id,ts,pool,mint,status,evidence FROM onchain_market_probes ORDER BY id DESC LIMIT 1');return response({mode:'PAPER',scope:'RESEARCH_READ_ONLY_NO_TRADE_DECISIONS',proof:r?{...r,evidence:JSON.parse(r.evidence||'{}')}:null})}if(p==='/api/onchain-proof'){const probe=await first(env,'SELECT id,ts,pool,mint,status,evidence FROM onchain_quote_probes ORDER BY id DESC LIMIT 1');return response({mode:'PAPER',scope:'READ_ONLY_POOL_SPOT_NO_VOLUME',probe:probe||null})}if(p==='/health'){const s=await first(env,'SELECT * FROM state WHERE id=1');let probe=null;if(new URL(req.url).searchParams.get('rpc')==='1'){try{const rpc=await heliusRpc(env,'getSlot',[{commitment:'confirmed'}]);probe={ok:Number.isSafeInteger(rpc?.result)&&rpc.result>0,slot:rpc.result};}catch(e){probe={ok:false,error:qs(e.message)}}}return response({service:'soliwkr-meme-desk',mode:'PAPER',worker:'ready',paused:!!s.paused,feedHealth:s.feed_health,heliusSecretConfigured:!!env.HELIUS_API_KEY,rpc:probe,lastCycle:s.last_cycle,cycles:s.cycles,lastError:s.last_error});}return response({error:'NOT_FOUND',mode:'PAPER'});}catch(e){return new Response(JSON.stringify({error:qs(e.message),mode:'PAPER'}),{status:503,headers:{'content-type':'application/json'}})}},async scheduled(controller,env,ctx){ctx.waitUntil(cycle(env));ctx.waitUntil(onchainProbe(env));ctx.waitUntil(onchainCandidateProbe(env));ctx.waitUntil(onchainMarketProof(env))}};
