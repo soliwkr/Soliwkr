@@ -7,14 +7,14 @@ const spl='TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA';
 function putKey(b,off,s){b.set(fromBase58(s),off)}
 function write(b,off,num,size){let n=BigInt(num);if(n<0)n+=(1n<<BigInt(size*8));for(let i=0;i<size;i++){b[off+i]=Number(n&255n);n>>=8n}}
 function account(bytes,owner){return {owner,data:[Buffer.from(bytes).toString('base64'),'base64']}}
-function fixture({virtual=-500000000n,baseVaultOwner=A.pool,quoteVaultOwner=A.pool,quoteMint=WSOL,program=PUMP_AMM_PROGRAM}={}){
+function fixture({virtual=-500000000n,baseVaultOwner=A.pool,quoteVaultOwner=A.pool,quoteMint=WSOL,program=PUMP_AMM_PROGRAM,baseProgram=spl,quoteProgram=spl}={}){
  const pool=new Uint8Array(301);putKey(pool,43,A.base);putKey(pool,75,quoteMint);putKey(pool,139,A.baseVault);putKey(pool,171,A.quoteVault);write(pool,245,virtual,16);
  const vault=(mint,owner,amount)=>{const b=new Uint8Array(165);putKey(b,0,mint);putKey(b,32,owner);write(b,64,amount,8);return b};
  const mint=decimal=>{const b=new Uint8Array(82);b[44]=decimal;return b};
  const rpc=async (method,params)=>{
   if(method==='getAccountInfo'){assert.equal(params[0],A.pool);return {result:{context:{slot:1234},value:account(pool,program)}}}
   if(method==='getMultipleAccounts'){assert.deepEqual(params[0],[A.baseVault,A.quoteVault,A.base,quoteMint]);return {result:{context:{slot:1234},value:[
-   account(vault(A.base,baseVaultOwner,1000000n),spl),account(vault(quoteMint,quoteVaultOwner,1500000000n),spl),account(mint(6),spl),account(mint(9),spl)
+   account(vault(A.base,baseVaultOwner,1000000n),baseProgram),account(vault(quoteMint,quoteVaultOwner,1500000000n),quoteProgram),account(mint(6),baseProgram),account(mint(9),quoteProgram)
   ]}}}
   throw Error('Unexpected RPC '+method);
  };
@@ -55,4 +55,19 @@ test('wrong user-supplied base mint is rejected',async()=>{
 });
 test('arbitrary quote assets rejected until routing/decimals audited',async()=>{
  await assert.rejects(()=>inspectPumpSwapPool(fixture({quoteMint:A.baseVault}),A.pool,A.base),/UNSUPPORTED_QUOTE_ASSET/);
+});
+
+test('Token-2022 readable only with extension-risk disclaimer',async()=>{
+ const program='TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+ const result=await inspectPumpSwapPool(fixture({baseProgram:program}),A.pool,A.base);
+ assert.equal(result.baseTokenProgram,program);
+ assert.equal(result.quoteTokenProgram,spl);
+ assert.equal(result.extensionsAudited,false);
+ assert.equal(result.status,'TOKEN_2022_EXTENSIONS_UNAUDITED_NOT_EXECUTABLE');
+});
+test('Token-2022 mint must match the vault token program',async()=>{
+ const token='TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb';
+ const rpc=fixture({baseProgram:token});
+ const rogue=async(m,p)=>{const r=await rpc(m,p);if(m==='getMultipleAccounts')r.result.value[0].owner=spl;return r};
+ await assert.rejects(()=>inspectPumpSwapPool(rogue,A.pool,A.base),/TOKEN_PROGRAM_UNSUPPORTED_OR_VAULT_MISMATCH/);
 });
