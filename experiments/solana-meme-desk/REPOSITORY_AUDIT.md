@@ -20,3 +20,11 @@ Implemented on branch `feature/solana-memecoin-desk-paper-20261026`:
 Official sample pool probe id=1 failed due manual sample-mint typo; id=2 corrected sample PASS via real Helius RPC. Actual spot was 0.00000018249568673 SOL/token at slot 461797569; virtual quote reserve was -125882 raw units, showing why raw vault balances alone are wrong.
 
 **Incomplete:** no independent 1-hour swap volume, executable fill, slippage/fees validation, or SOL/USD conversion yet. No change to trade filters or P&L. Never use the adapter as a USD quote or permission to place orders without those proofs. Full paper reliability remains blocked while market data sources rate-limit.
+
+## Second live benchmark (26 October, 20:26 UTC)
+
+- Verified a **Scout-discovered PumpSwap pool**, `MtD7C3bpRPP2LNim3DUfnoVTuRSQHBuCWhu9fKYKJqh`, mint `8ypYfW5cjafrfAZij8TZj5SFHAbPNpiRio96LMzypDkn`.
+- Helius mainnet slot `461798973`: spot `0.000000024710921618 SOL/token`, effective quote reserve `22114684439` raw, virtual reserve `17584436792` raw; program and vault mint checks passed.
+- Base mint is **Token-2022**, quote mint is classic SPL WSOL. Program owner matching passed. Extension features and transfer fee/scale are not audited: status `TOKEN_2022_EXTENSIONS_UNAUDITED_NOT_EXECUTABLE`.
+- Code remains read-only. No input to the existing trading engine was changed. Important remaining gaps: independent 1h swap volume, quote currency USD conversion, pool-specific fee/slippage model, and Token-2022 extensions.
+- Initial sample mint transcription error and first strict Token-2022 rejection remain preserved as FAIL records alongside corrected PASS records in the D1 probe table.
