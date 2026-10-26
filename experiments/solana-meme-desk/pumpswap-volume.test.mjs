@@ -66,3 +66,24 @@ test('unrelated event data never becomes a PumpSwap trade',()=>{
  const x={meta:{logMessages:['Program data: '+Buffer.from('unrelated text').toString('base64')]}};
  assert.deepEqual(parsePumpSwapTradeEvents(x,'P'),[]);
 });
+
+test('official SellEvent decodes recorded dynamic fee amounts, no fee assumptions',()=>{
+ const pool=toBase58(new Uint8Array(32).fill(3));
+ const raw=Buffer.alloc(400);
+ Buffer.from([62,47,55,10,165,3,220,42]).copy(raw,0);
+ raw.writeBigInt64LE(2000000n,8);
+ raw.writeBigUInt64LE(21873181n,64);
+ raw.writeBigUInt64LE(20n,72);
+ raw.writeBigUInt64LE(45000n,80);
+ raw.writeBigUInt64LE(5n,88);
+ raw.writeBigUInt64LE(11000n,96);
+ raw.writeBigUInt64LE(50n,344);
+ raw.writeBigUInt64LE(115000n,352);
+ Buffer.from(fromBase58(pool)).copy(raw,120);
+ const tx={meta:{logMessages:['Program data: '+raw.toString('base64')]}};
+ const events=parsePumpSwapTradeEvents(tx,pool);
+ assert.equal(events[0].quoteRaw,21873181n);
+ assert.equal(events[0].fees.lpFeeRaw,'45000');
+ assert.equal(events[0].fees.protocolFeeRaw,'11000');
+ assert.equal(events[0].fees.creatorFeeRaw,'115000');
+});
