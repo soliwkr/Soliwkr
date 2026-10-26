@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PUMP_AMM_PROGRAM,WSOL} from './pumpswap-pool.mjs';
-import {hourlyCoverage,swapQuoteDelta,boundedOneHourTurnover} from './pumpswap-volume.mjs';
+import {PUMP_AMM_PROGRAM,WSOL,toBase58,fromBase58} from './pumpswap-pool.mjs';
+import {hourlyCoverage,swapQuoteDelta,boundedOneHourTurnover,parsePumpSwapTradeEvents} from './pumpswap-volume.mjs';
 const proof={pool:'P',baseVault:'BVAULT',quoteVault:'QVAULT',baseMint:'BASE',quoteMint:WSOL};
 const entry=(accountIndex,mint,amount,decimals)=>({accountIndex,mint,uiTokenAmount:{amount:String(amount),decimals}});
 function tx(baseFrom,baseTo,quoteFrom,quoteTo,{logs=true,failed=false}={}){
@@ -47,4 +47,22 @@ test('missing transaction data invalidates volume',async()=>{
  const rpc=async method=>method==='getSignaturesForAddress'?{result:[{signature:'a',blockTime:2000000}]}:{result:null};
  const r=await boundedOneHourTurnover(rpc,proof,{nowSeconds:2000001});
  assert.equal(r.verified,false);assert.equal(r.volumeNative,null);
+});
+
+test('official BuyEvent quote amount, correct pool, negative reserve fee-independent',()=>{
+ const pool=toBase58(new Uint8Array(32).fill(1));
+ const raw=Buffer.alloc(152);
+ Buffer.from([103,244,82,31,44,245,119,119]).copy(raw,0);
+ raw.writeBigInt64LE(2000000n,8);
+ raw.writeBigUInt64LE(1000000000n,64);
+ Buffer.from(fromBase58(pool)).copy(raw,120);
+ const x={meta:{logMessages:['Program '+PUMP_AMM_PROGRAM+' invoke [1]','Program log: Instruction: BuyV2','Program data: '+raw.toString('base64')]}};
+ const events=parsePumpSwapTradeEvents(x,pool);
+ assert.equal(events.length,1);assert.equal(events[0].side,'BUY');
+ assert.equal(events[0].quoteRaw,1000000000n);
+ assert.equal(parsePumpSwapTradeEvents(x,toBase58(new Uint8Array(32).fill(2))).length,0);
+});
+test('unrelated event data never becomes a PumpSwap trade',()=>{
+ const x={meta:{logMessages:['Program data: '+Buffer.from('unrelated text').toString('base64')]}};
+ assert.deepEqual(parsePumpSwapTradeEvents(x,'P'),[]);
 });
