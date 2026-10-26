@@ -54,6 +54,11 @@ async function scoutRaydiumFeed(){
  const payload=await readJson('https://api-v3.raydium.io/pools/info/list?poolType=standard&poolSortField=apr24h&sortType=desc&pageSize=100&page=1');
  return parseRaydiumPools(payload);
 }
+// Volume-ranked Raydium pools are another incomplete sample, not a new-pool feed.
+async function scoutRaydiumVolumeFeed(){
+ const payload=await readJson('https://api-v3.raydium.io/pools/info/list?poolType=standard&poolSortField=volume24h&sortType=desc&pageSize=500&page=1');
+ return parseRaydiumPools(payload);
+}
 async function scoutGeckoFeed(){
  const payload=await readJson('https://api.geckoterminal.com/api/v2/networks/solana/new_pools?page=1&include=base_token,quote_token,dex');
  if(!Array.isArray(payload?.data))throw Error('GECKO_RESPONSE_UNVERIFIABLE');
@@ -80,6 +85,7 @@ async function scoutDexSample(){
 async function scout(env){
  const providers=[
   ['RAYDIUM_APR_SAMPLE',scoutRaydiumFeed],
+  ['RAYDIUM_VOLUME_SAMPLE',scoutRaydiumVolumeFeed],
   ['GECKO_NEW_POOLS_PAGE1',scoutGeckoFeed]
  ];
  const outcomes=[];
@@ -93,7 +99,7 @@ async function scout(env){
  }
  const pools=new Map();
  for(const x of outcomes)for(const y of x.data){if(!pools.has(y.pool))pools.set(y.pool,y)}
- const hasPrimary=outcomes.slice(0,2).every(x=>x.ok);
+ const hasPrimary=outcomes.some(x=>x.name==='GECKO_NEW_POOLS_PAGE1'&&x.ok)&&outcomes.some(x=>x.name.startsWith('RAYDIUM_')&&x.ok);
  const anySucceeded=outcomes.some(x=>x.ok);
  const status=!anySucceeded?'BLOCKED':hasPrimary?'PARTIAL_COVERAGE':'DEGRADED';
  const errors=outcomes.filter(x=>!x.ok).map(x=>x.name+':'+x.error);
